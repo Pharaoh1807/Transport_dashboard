@@ -65,17 +65,17 @@ const CarrierProvinceMatrix = ({ data }) => {
   const getHeatBg = (val) => {
     if (!val || val === 0) return isDark ? 'bg-slate-950/40 text-slate-600' : 'bg-slate-100 text-slate-400';
     const ratio = val / (maxVal || 1);
-    if (ratio > 0.7) return 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/30';
-    if (ratio > 0.4) return 'bg-blue-500/70 text-white font-semibold';
-    if (ratio > 0.15) return isDark ? 'bg-blue-500/30 text-blue-200' : 'bg-blue-100 text-blue-800 font-medium';
-    return isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-50 text-blue-700';
+    if (ratio > 0.6) return 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/30';
+    if (ratio > 0.3) return 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold shadow-sm';
+    if (ratio > 0.1) return isDark ? 'bg-blue-500/30 text-blue-200 font-semibold' : 'bg-blue-100 text-blue-800 font-medium';
+    return isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-50 text-blue-700';
   };
 
   const formatTons = (val) => val > 0 ? new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(val) : '-';
   const inputBg = isDark ? 'bg-slate-950/80 border-slate-700 text-slate-200 placeholder-slate-500' : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400';
 
   return (
-    <div className={`border rounded-2xl p-5 shadow-xl flex flex-col transition-colors duration-200 ${
+    <div className={`border rounded-2xl p-5 shadow-xl flex flex-col h-fit self-start transition-colors duration-200 ${
       isDark ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800'
     }`}>
       
@@ -98,7 +98,7 @@ const CarrierProvinceMatrix = ({ data }) => {
       </div>
 
       {/* Heatmap Matrix Table */}
-      <div className="overflow-x-auto max-h-[380px]">
+      <div className="overflow-x-auto max-h-[420px]">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>

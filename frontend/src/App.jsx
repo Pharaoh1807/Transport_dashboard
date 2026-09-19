@@ -210,7 +210,7 @@ const Dashboard = () => {
               <KPICards kpis={dashboardData?.kpis} />
 
               {/* Row 2: Top Carrier Rankings & Carrier x Province Pivot Heatmap */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                 <CarrierRankingChart
                   data={dashboardData?.charts?.carrierRanking}
                   onCarrierClick={(carrierName) => setSelectedCarrier(carrierName)}
@@ -225,10 +225,7 @@ const Dashboard = () => {
                 <CostBreakdownChart data={dashboardData?.charts?.costBreakdown} />
               </div>
 
-              {/* Row 4: Raw Detailed Data Table */}
-              <RawDataTable activeFileId={activeFile.file_id} filters={filters} />
-
-              {/* Row 5: Vietnam Map Analytics (Bản đồ GeoJSON 63 Tỉnh Thành ở cuối trang) */}
+              {/* Row 4: Vietnam Map Analytics (Bản đồ GeoJSON 63 Tỉnh Thành ở cuối trang) */}
               <VietnamMapChart
                 data={dashboardData?.charts?.vietnamMap}
                 activeFileId={activeFile?.file_id}
