@@ -459,8 +459,8 @@ class TransportDataProcessor:
         if not df.empty:
             valid_map_df = df[(df['carrier_name'] != 'UNKNOWN') & (df['province'] != 'UNKNOWN')]
             if not valid_map_df.empty:
-                # Top 5 main carriers by tonnage
-                top_carrier_names = valid_map_df.groupby('carrier_name')['tons'].sum().nlargest(5).index.tolist()
+                # All carriers sorted by total tonnage descending
+                top_carrier_names = valid_map_df.groupby('carrier_name')['tons'].sum().sort_values(ascending=False).index.tolist()
                 vietnam_map_data['top_carriers'] = top_carrier_names
 
                 prov_grouped = valid_map_df.groupby(['province', 'carrier_name']).agg(
@@ -482,8 +482,7 @@ class TransportDataProcessor:
                     carrier_breakdown = {}
                     for _, c_row in p_details.iterrows():
                         c_name = str(c_row['carrier_name'])
-                        c_key = c_name if c_name in top_carrier_names else 'Khác'
-                        carrier_breakdown[c_key] = carrier_breakdown.get(c_key, 0.0) + round(float(c_row['tons']), 2)
+                        carrier_breakdown[c_name] = carrier_breakdown.get(c_name, 0.0) + round(float(c_row['tons']), 2)
 
                     province_map_list.append({
                         'province': prov_name,

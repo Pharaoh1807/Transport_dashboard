@@ -8,6 +8,9 @@ const GEO_URL = '/vietnam-provinces-wgs84.json';
 
 const CARRIER_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4',
+  '#f97316', '#14b8a6', '#a855f7', '#6366f1', '#ef4444', '#84cc16',
+  '#0284c7', '#d97706', '#c026d3', '#059669', '#dc2626', '#7c3aed',
+  '#e11d48', '#0284c7', '#16a34a', '#ca8a04'
 ];
 
 const fmtNum = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v || 0));
@@ -229,7 +232,12 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   const carrierColorMap = useMemo(() => {
     const map = {};
     topCarriers.forEach((cName, idx) => {
-      map[cName] = CARRIER_COLORS[idx % CARRIER_COLORS.length];
+      if (CARRIER_COLORS[idx]) {
+        map[cName] = CARRIER_COLORS[idx];
+      } else {
+        const hue = (idx * 137.5) % 360;
+        map[cName] = `hsl(${hue}, 70%, 55%)`;
+      }
     });
     map['Khác'] = '#64748b';
     return map;
@@ -277,8 +285,17 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
 
   const getGeoFillColor = (pInfo) => {
     if (!pInfo || pInfo.total_tons === 0) return isDark ? '#334155' : '#cbd5e1';
-    // TEST COLOR FOR PROVINCES WITH DATA: BRIGHT RED (#ff0000)
-    return '#ff0000';
+    const carrierEntries = Object.entries(pInfo.carriers || {});
+    if (carrierEntries.length === 0) return isDark ? '#334155' : '#cbd5e1';
+
+    const dominantCarrier = carrierEntries.sort((a, b) => b[1] - a[1])[0][0];
+
+    if (selectedCarrier !== 'ALL') {
+      const hasCarrier = pInfo.carriers && pInfo.carriers[selectedCarrier];
+      if (hasCarrier) return carrierColorMap[selectedCarrier] || '#3b82f6';
+      return isDark ? '#334155' : '#cbd5e1'; // Visible slate gray when not served by selected carrier
+    }
+    return carrierColorMap[dominantCarrier] || '#3b82f6';
   };
 
   const getGeoOpacity = (pInfo) => {
