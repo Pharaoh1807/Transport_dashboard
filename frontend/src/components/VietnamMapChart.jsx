@@ -276,30 +276,21 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   }, [provincesData]);
 
   const getGeoFillColor = (pInfo) => {
-    if (!pInfo || pInfo.total_tons === 0) return isDark ? '#1e293b' : '#e2e8f0';
-    const carrierEntries = Object.entries(pInfo.carriers || {});
-    if (carrierEntries.length === 0) return isDark ? '#1e293b' : '#e2e8f0';
-
-    const dominantCarrier = carrierEntries.sort((a, b) => b[1] - a[1])[0][0];
-
-    if (selectedCarrier !== 'ALL') {
-      const hasCarrier = pInfo.carriers && pInfo.carriers[selectedCarrier];
-      if (hasCarrier) return carrierColorMap[selectedCarrier] || '#3b82f6';
-      return isDark ? '#1e293b' : '#f1f5f9'; // Clean light slate gray when not served by selected carrier
-    }
-    return carrierColorMap[dominantCarrier] || '#3b82f6';
+    if (!pInfo || pInfo.total_tons === 0) return isDark ? '#334155' : '#cbd5e1';
+    // TEST COLOR FOR PROVINCES WITH DATA: BRIGHT RED (#ff0000)
+    return '#ff0000';
   };
 
   const getGeoOpacity = (pInfo) => {
-    if (selectedCarrier === 'ALL') return pInfo && pInfo.total_tons > 0 ? 0.95 : 0.85;
-    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.45; // Dimmed gray opacity
-    return 1;
+    if (selectedCarrier === 'ALL') return 1.0; // Solid non-transparent fill
+    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.45; // Dimmed gray when carrier selected
+    return 1.0;
   };
 
   const muted = isDark ? 'text-slate-400' : 'text-slate-500';
 
   return (
-    <div className={`p-5 rounded-2xl border transition-colors duration-200 ${
+    <div className={`p-5 rounded-2xl border transition-colors duration-200 relative z-20 ${
       isDark ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-800 shadow-md'
     }`}>
 
@@ -351,12 +342,12 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
       </div>
 
       {/* Map + Legend */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-20">
 
-        {/* Map */}
+        {/* Map (without overflow-hidden so tooltips are never clipped) */}
         <div
-          className="lg:col-span-8 flex justify-center relative rounded-2xl overflow-hidden border"
-          style={{ backgroundColor: isDark ? '#0f172a' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0' }}
+          className="lg:col-span-8 flex justify-center relative rounded-2xl border"
+          style={{ backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#475569' : '#cbd5e1' }}
         >
           <ComposableMap
             projection="geoMercator"
@@ -376,7 +367,11 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
                       geography={geo}
                       onMouseMove={evt => {
                         const rect = evt.currentTarget.closest('svg').getBoundingClientRect();
-                        setTooltipPos({ x: evt.clientX - rect.left + 12, y: evt.clientY - rect.top - 40 });
+                        const relX = evt.clientX - rect.left;
+                        const relY = evt.clientY - rect.top;
+                        const topY = relY > 340 ? relY - 140 : relY + 15;
+                        const leftX = relX > 350 ? relX - 210 : relX + 15;
+                        setTooltipPos({ x: leftX, y: topY });
                         setTooltipContent({ name: geo.properties.name || geo.properties['woe-name'] || '?', info: pInfo });
                       }}
                       onMouseLeave={() => setTooltipContent(null)}
@@ -385,7 +380,7 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
                           fill: fillColor,
                           fillOpacity: opacity,
                           stroke: '#ffffff',
-                          strokeWidth: 1.2,
+                          strokeWidth: 1.5,
                           outline: 'none',
                           transition: 'fill 200ms, fill-opacity 200ms'
                         },
@@ -393,7 +388,7 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
                           fill: '#f59e0b',
                           fillOpacity: 1,
                           stroke: '#ffffff',
-                          strokeWidth: 2.2,
+                          strokeWidth: 2.5,
                           outline: 'none',
                           cursor: 'pointer'
                         },
@@ -406,15 +401,15 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
             </Geographies>
           </ComposableMap>
 
-          {/* Hover Tooltip */}
+          {/* Hover Tooltip z-50 */}
           {tooltipContent && (
             <div
-              className="absolute z-30 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
+              className="absolute z-50 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
               style={{
                 left: `${tooltipPos.x}px`,
                 top: `${tooltipPos.y}px`,
-                backgroundColor: isDark ? 'rgba(11, 15, 25, 0.96)' : 'rgba(15, 23, 42, 0.96)',
-                borderColor: '#334155',
+                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.96)',
+                borderColor: '#475569',
                 color: '#f8fafc'
               }}
             >
