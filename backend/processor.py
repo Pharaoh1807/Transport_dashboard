@@ -223,14 +223,23 @@ class TransportDataProcessor:
         else:
             print(f"ℹ️ No unnecessary columns found to remove")
 
-        # Map column names
+        # Map column names - handle duplicates by keeping first match only
         column_rename = {}
+        canonical_to_original = {}  # Track which original column maps to each canonical name
+
         for col in df.columns:
             cleaned_col = remove_accents(str(col))
             if cleaned_col in REVERSE_MAPPING:
-                column_rename[col] = REVERSE_MAPPING[cleaned_col]
+                canonical = REVERSE_MAPPING[cleaned_col]
+                # Only keep first occurrence to avoid duplicate columns
+                if canonical not in canonical_to_original:
+                    column_rename[col] = canonical
+                    canonical_to_original[canonical] = col
+                else:
+                    print(f"⚠️ Duplicate column mapping: '{col}' maps to '{canonical}' (already mapped from '{canonical_to_original[canonical]}'), skipping")
 
-        df.rename(columns=column_rename, inplace=True)
+        if column_rename:
+            df.rename(columns=column_rename, inplace=True)
 
         # Ensure all canonical columns exist
         for col in COLUMN_MAPPING.keys():
