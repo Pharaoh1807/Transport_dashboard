@@ -4,7 +4,7 @@ import { Navigation, Truck, Layers, Info, TrendingUp, DollarSign, Package, Route
 import { useTheme } from '../context/ThemeContext';
 import api from '../api/client';
 
-const GEO_URL = '/vietnam-provinces-wgs84.json';
+const GEO_URL = '/Transport_dashboard/vietnam-provinces-wgs84.json';
 
 const CARRIER_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4',
