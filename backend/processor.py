@@ -17,22 +17,15 @@ def remove_accents(text: str) -> str:
 
 COLUMN_MAPPING = {
     'plan_issue_date': ['plan_issue_date', 'plan issue date', 'ngay_len_ke_hoach', 'ngay_ke_hoach', 'plan_date', 'issue_date'],
-    'settlement_date': ['settlement_date', 'settlement date', 'ngay_quyet_toan', 'quyet_toan_date'],
     'carrier_code': ['carrier_code', 'service_agent', 'service agent', 'ma_nvc', 'ma_nha_van_chuyen'],
     'carrier_name': ['carrier_name', 'short_name', 'short name', 'ten_nvc', 'ten_nha_van_chuyen', 'nvc', 'carrier'],
-    'plant': ['plant', 'ma_nha_may', 'nha_may', 'kho_xuat'],
     'shipment_number': ['shipment_number', 'shipment number', 'so_lo', 'so_lo_hang', 'shipment', 'lo_hang'],
     'is_return': ['is_return', 'is return', 'hang_tra', 'hang_tra_ve', 'return'],
     'ship_to_code': ['ship_to_code', 'ship_to', 'ship to', 'ma_diem_giao'],
     'ship_to_name': ['ship_to_name', 'ship to name', 'ten_diem_giao'],
-    'ship_to_address': ['ship_to_address', 'ship to address', 'dia_chi_giao'],
     'province': ['province', 'province_name', 'province name', 'tinh_thanh', 'tinh', 'khu_vuc'],
     'route_code': ['route_code', 'route code', 'ma_tuyen', 'tuyen'],
     'delivery_type': ['delivery_type', 'delivery type', 'loai_hinh_giao', 'loai_giao_hang'],
-    'material_code': ['material_code', 'material', 'ma_hang', 'ma_san_pham'],
-    'material_name': ['material_name', 'material name', 'ten_hang', 'ten_san_pham'],
-    'base_unit': ['base_unit', 'base unit', 'don_vi_tinh', 'dvt'],
-    'qty': ['qty', 'quantity', 'so_luong'],
     'tons': ['tons', 'tons_calc', 'tons calc', 'so_tan', 'trong_luong_tan'],
     'freight_fee_1': ['freight_fee_1', 'zf01', 'cuoc_chinh_1'],
     'freight_fee_2': ['freight_fee_2', 'zf02', 'cuoc_chinh_2'],
@@ -203,6 +196,33 @@ class TransportDataProcessor:
         """Standardize column names, data types, clean text, and parse dates."""
         df = raw_df  # Remove .copy() to save memory
 
+        # Remove unnecessary columns to reduce memory and file size
+        # Based on actual file structure from datavc.xlsx
+        columns_to_remove = [
+            'plant', 'id', 'sale org', 'mcat', 'invoice id', 'lock status',
+            'settlement date', 'ship to', 'ship to address', 'trans local',
+            'od', 'so', 'chassic code', 'material', 'material name', 'base unit', 'qty',
+            'channel'  # Thêm channel vì không cần thiết cho dashboard
+        ]
+
+        # Match columns using fuzzy matching (remove accents)
+        columns_to_remove_normalized = [remove_accents(col) for col in columns_to_remove]
+        columns_to_remove_normalized_set = set(columns_to_remove_normalized)
+
+        cols_to_drop = []
+        for col in df.columns:
+            if remove_accents(str(col)) in columns_to_remove_normalized_set:
+                cols_to_drop.append(col)
+
+        if cols_to_drop:
+            print(f"🗑️ Removing {len(cols_to_drop)} unnecessary columns: {cols_to_drop}")
+            print(f"📊 Before removal: {len(df.columns)} columns, {df.memory_usage(deep=True).sum() / 1024:.1f} KB memory")
+            df.drop(columns=cols_to_drop, inplace=True)
+            gc.collect()  # Force garbage collection after column removal
+            print(f"📊 After removal: {len(df.columns)} columns, {df.memory_usage(deep=True).sum() / 1024:.1f} KB memory")
+        else:
+            print(f"ℹ️ No unnecessary columns found to remove")
+
         # Map column names
         column_rename = {}
         for col in df.columns:
@@ -215,12 +235,16 @@ class TransportDataProcessor:
         # Ensure all canonical columns exist
         for col in COLUMN_MAPPING.keys():
             if col not in df.columns:
-                if col in ['tons', 'qty', 'freight_fee_1', 'freight_fee_2', 'surcharge_1', 'surcharge_3', 'surcharge_4', 'tax_or_fee_1', 'tax_or_fee_3', 'tax_or_fee_4', 'total_amount']:
+                if col in ['tons', 'freight_fee_1', 'freight_fee_2', 'surcharge_1', 'surcharge_3', 'surcharge_4', 'tax_or_fee_1', 'tax_or_fee_3', 'tax_or_fee_4', 'total_amount']:
                     df[col] = 0.0
                 elif col == 'is_return':
                     df[col] = False
                 else:
                     df[col] = ''
+
+        # Force garbage collection after preprocessing
+        gc.collect()
+        print(f"✅ Preprocessing complete: {len(df.columns)} columns, {len(df)} rows")
 
         # Parse dates
         df['plan_issue_date'] = self._convert_date_column(df['plan_issue_date'])

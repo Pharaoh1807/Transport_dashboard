@@ -123,7 +123,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100">Upload Dữ Liệu Vận Chuyển SAP</h3>
-            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Streaming chunk processing • Hỗ trợ file lên đến 50MB (free tier)</p>
+            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Auto-remove unnecessary columns • Streaming chunk processing • Hỗ trợ file lên đến 50MB (free tier)</p>
           </div>
         </div>
 

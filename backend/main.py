@@ -45,6 +45,7 @@ async def startup_db_check():
     print("💾 Memory optimization: openpyxl read_only=True + chunked DB insertion")
     print("🔧 Chunk size: 1,000 rows (streaming for memory efficiency)")
     print("🧹 Memory cache: Global latest file only (not per-user)")
+    print("🗑️ Auto-removal of unnecessary columns to reduce memory usage")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
