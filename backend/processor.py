@@ -255,33 +255,43 @@ class TransportDataProcessor:
         gc.collect()
         print(f"✅ Preprocessing complete: {len(df.columns)} columns, {len(df)} rows")
 
-        # Parse dates
-        df['plan_issue_date'] = self._convert_date_column(df['plan_issue_date'])
-        df['settlement_date'] = self._convert_date_column(df['settlement_date'])
+        # Parse dates - only if column exists
+        if 'plan_issue_date' in df.columns:
+            df['plan_issue_date'] = self._convert_date_column(df['plan_issue_date'])
+        if 'settlement_date' in df.columns:
+            df['settlement_date'] = self._convert_date_column(df['settlement_date'])
 
-        # Derive Year, Month, Year-Month
-        df['year'] = df['plan_issue_date'].dt.year.fillna(0).astype(int)
-        df['month'] = df['plan_issue_date'].dt.month.fillna(0).astype(int)
-        df['year_month'] = df['plan_issue_date'].dt.strftime('%Y-%m').fillna('UNKNOWN')
+        # Derive Year, Month, Year-Month - only if plan_issue_date exists
+        if 'plan_issue_date' in df.columns:
+            df['year'] = df['plan_issue_date'].dt.year.fillna(0).astype(int)
+            df['month'] = df['plan_issue_date'].dt.month.fillna(0).astype(int)
+            df['year_month'] = df['plan_issue_date'].dt.strftime('%Y-%m').fillna('UNKNOWN')
+        else:
+            df['year'] = 0
+            df['month'] = 0
+            df['year_month'] = 'UNKNOWN'
 
-        # Clean string columns
+        # Clean string columns - only if column exists
         string_cols = ['carrier_code', 'carrier_name', 'plant', 'shipment_number', 'ship_to_code', 'ship_to_name', 'ship_to_address', 'province', 'route_code', 'delivery_type', 'material_code', 'material_name', 'base_unit']
         for col in string_cols:
-            df[col] = df[col].astype(str).str.strip().str.upper()
-            df[col] = df[col].replace(['NAN', 'NONE', 'NULL', 'UNKNOWN', ''], 'UNKNOWN')
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip().str.upper()
+                df[col] = df[col].replace(['NAN', 'NONE', 'NULL', 'UNKNOWN', ''], 'UNKNOWN')
 
-        # Clean boolean is_return
+        # Clean boolean is_return - only if column exists
         def parse_bool(x):
             if pd.isna(x): return False
             val = str(x).strip().lower()
             return val in ['true', '1', 'yes', 'y', 'x', 't']
 
-        df['is_return'] = df['is_return'].apply(parse_bool)
+        if 'is_return' in df.columns:
+            df['is_return'] = df['is_return'].apply(parse_bool)
 
-        # Clean numeric columns
+        # Clean numeric columns - only if column exists
         numeric_cols = ['qty', 'tons', 'freight_fee_1', 'freight_fee_2', 'surcharge_1', 'surcharge_3', 'surcharge_4', 'tax_or_fee_1', 'tax_or_fee_3', 'tax_or_fee_4', 'total_amount']
         for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
 
         # Drop rows where critical metadata is missing completely if any
         return df
