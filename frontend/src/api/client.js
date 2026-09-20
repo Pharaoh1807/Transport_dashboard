@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://transport-dashboard-9mf7.onrender.com',
-  timeout: 300000, // 5 minutes timeout for large files (100MB+)
+  timeout: 600000, // 10 minutes timeout for large files (100MB+)
 });
 
 api.interceptors.request.use((config) => {
@@ -27,6 +27,14 @@ api.interceptors.response.use(
         window.location.replace('/');
       }
     }
+
+    // Better error messages for timeout and network errors
+    if (error.code === 'ECONNABORTED') {
+      error.message = 'Request timeout. Server có thể đang quá tải hoặc file quá lớn. Vui lòng thử lại hoặc chia nhỏ file.';
+    } else if (error.code === 'ERR_NETWORK' || !error.response) {
+      error.message = 'Network error. Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+    }
+
     return Promise.reject(error);
   }
 );

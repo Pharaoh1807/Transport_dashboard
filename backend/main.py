@@ -112,9 +112,14 @@ async def upload_file(
     if file_size > 100 * 1024 * 1024:  # 100MB limit
         raise HTTPException(status_code=413, detail="File quá lớn. Vui lòng upload file dưới 100MB.")
 
+    # Warn for very large files
+    if file_size > 50 * 1024 * 1024:  # > 50MB
+        print(f"⚠️ Large file upload detected: {file_size / (1024*1024):.1f}MB - this may take several minutes")
+
     # Process in chunks for large files
     if file_size > 10 * 1024 * 1024:  # > 10MB use chunk processing
         chunk_size = 10000  # Process 10,000 rows at a time
+        print(f"⚡ Chunk processing enabled for {file_size / (1024*1024):.1f}MB file")
     else:
         chunk_size = None  # Process full file for small files
 
@@ -133,11 +138,14 @@ async def upload_file(
     await db.files.delete_many({"user_id": user_id})
 
     # 2. Get sheet names & load default sheet 0
+    print(f"📋 Reading sheet names from {file_size / (1024*1024):.1f}MB file...")
     sheet_names = TransportDataProcessor.get_sheet_names(contents)
     selected_sheet = sheet_names[0] if sheet_names else 0
 
     # Load with chunk processing for large files
+    print(f"🔄 Loading Excel data with chunk processing (chunk_size={chunk_size})...")
     processor = TransportDataProcessor.load_excel(contents, sheet_name=selected_sheet, chunk_size=chunk_size)
+    print(f"✅ Excel data loaded successfully: {len(processor.df)} rows")
 
     # 3. Store file metadata in MongoDB
     file_meta = {

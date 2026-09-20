@@ -65,13 +65,28 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percentCompleted);
-        }
+        },
+        timeout: 600000 // 10 minutes timeout for large files
       });
       setUploadResult(res.data);
       setSelectedSheet(res.data.selected_sheet);
       onUploadSuccess(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Lỗi xử lý file Excel SAP. Kiểm tra kết nối mạng hoặc dung lượng file.');
+      let errorMessage = 'Lỗi xử lý file Excel SAP.';
+
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Timeout: Server quá tải hoặc file quá lớn. Vui lòng thử lại hoặc chia nhỏ file.';
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
+      } else if (err.response?.status === 413) {
+        errorMessage = 'File quá lớn. Vui lòng chia nhỏ file hoặc sử dụng file dưới 100MB.';
+      } else if (err.response?.status === 502) {
+        errorMessage = 'Server quá tải. Vui lòng thử lại sau hoặc sử dụng file nhỏ hơn.';
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
