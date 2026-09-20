@@ -21,7 +21,7 @@ app = FastAPI(title="SAP Transportation Data Analysis API", version="2.0.0")
 # ["https://pharaoh1807.github.io", "http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to specific domains in production
+    allow_origins=["https://pharaoh1807.github.io", "http://localhost:3000", "*"],  # Allow GitHub Pages and local dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
