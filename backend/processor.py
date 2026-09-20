@@ -1,8 +1,10 @@
 import io
 import re
 import unicodedata
+import gc
 import pandas as pd
 import numpy as np
+from openpyxl import load_workbook
 
 def remove_accents(text: str) -> str:
     """Remove Vietnamese accents and normalize string to lowercase snake_case for comparison."""
@@ -88,52 +90,103 @@ class TransportDataProcessor:
         return excel_file.sheet_names
 
     @classmethod
-    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=5000) -> 'TransportDataProcessor':
-        """Load Excel file with chunk processing for large files."""
+    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=2000) -> 'TransportDataProcessor':
+        """Load Excel file with streaming reading using openpyxl read_only=True for memory efficiency."""
         header_row = cls.detect_header_row(file_bytes, sheet_name=sheet_name)
-        engine = cls._get_engine(file_bytes)
-        kwargs = {'engine': engine} if engine else {}
 
-        # If chunk_size is None, use full read
+        # If chunk_size is None, use pandas full read for small files
         if chunk_size is None:
-            print("📖 Using full read (no chunking)")
+            print("📖 Using pandas full read (no chunking)")
+            engine = cls._get_engine(file_bytes)
+            kwargs = {'engine': engine} if engine else {}
             raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
             return cls(raw_df)
 
+        # Use openpyxl read_only=True for streaming (memory-efficient)
         try:
-            print(f"🔄 Attempting chunk reading with chunk_size={chunk_size}")
-            # Try chunk reading if supported
-            chunks = []
-            chunk_count = 0
-            for chunk in pd.read_excel(
-                io.BytesIO(file_bytes),
-                sheet_name=sheet_name,
-                header=header_row,
-                chunksize=chunk_size,
-                **kwargs
-            ):
-                chunks.append(chunk)
-                chunk_count += 1
-                # Clear memory more frequently
-                if chunk_count % 3 == 0:
-                    import gc
-                    gc.collect()
-                    print(f"🧹 Memory cleanup after chunk {chunk_count}")
+            print(f"🔄 Using openpyxl streaming read with chunk_size={chunk_size}")
 
-            if chunks:
-                print(f"✅ Successfully read {len(chunks)} chunks, concatenating...")
-                raw_df = pd.concat(chunks, ignore_index=True)
-                print(f"✅ Concatenated {len(raw_df)} rows")
-                return cls(raw_df)
+            # Save bytes to temp file for openpyxl
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+                tmp_file.write(file_bytes)
+                tmp_file_path = tmp_file.name
+
+            try:
+                # Load workbook in read-only mode (streaming)
+                wb = load_workbook(tmp_file_path, read_only=True, data_only=True)
+
+                # Get the sheet
+                if isinstance(sheet_name, int):
+                    ws = wb.worksheets[sheet_name]
+                else:
+                    ws = wb[sheet_name]
+
+                # Read header row
+                header_row_idx = header_row + 1  # openpyxl is 1-indexed
+                headers = None
+                chunks = []
+                chunk_count = 0
+
+                print(f"📋 Reading data starting from row {header_row_idx + 1}...")
+                current_chunk = []
+
+                for i, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
+                    if i == 0:
+                        # First row after header is our data header
+                        headers = [str(cell) if cell is not None else f"col_{j}" for j, cell in enumerate(row)]
+                        print(f"📋 Headers detected: {headers[:5]}...")
+                        continue
+
+                    current_chunk.append(row)
+
+                    # Process chunk when it reaches chunk_size
+                    if len(current_chunk) >= chunk_size:
+                        chunk_df = pd.DataFrame(current_chunk, columns=headers)
+                        chunks.append(chunk_df)
+                        chunk_count += 1
+
+                        # Memory cleanup
+                        del current_chunk
+                        current_chunk = []
+                        gc.collect()
+
+                        if chunk_count % 5 == 0:
+                            print(f"🧹 Processed {chunk_count} chunks ({chunk_count * chunk_size} rows)")
+
+                # Process remaining rows
+                if current_chunk:
+                    chunk_df = pd.DataFrame(current_chunk, columns=headers)
+                    chunks.append(chunk_df)
+                    del current_chunk
+                    gc.collect()
+
+                wb.close()
+
+                if chunks:
+                    print(f"✅ Successfully read {len(chunks)} chunks, concatenating...")
+                    raw_df = pd.concat(chunks, ignore_index=True)
+                    print(f"✅ Concatenated {len(raw_df)} rows")
+                    return cls(raw_df)
+                else:
+                    print("⚠️ No data chunks found, falling back to pandas")
+                    raise ValueError("No data found in streaming read")
+
+            finally:
+                # Clean up temp file
+                import os
+                if os.path.exists(tmp_file_path):
+                    os.unlink(tmp_file_path)
+
         except Exception as e:
-            print(f"⚠️ Chunk reading failed: {e}, falling back to full read")
-            import gc
+            print(f"⚠️ Streaming read failed: {e}, falling back to pandas")
             gc.collect()
 
-        # Fallback to full read for small files or unsupported engines
-        print("📖 Fallback to full read")
-        raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
-        return cls(raw_df)
+            # Fallback to pandas full read
+            engine = cls._get_engine(file_bytes)
+            kwargs = {'engine': engine} if engine else {}
+            raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
+            return cls(raw_df)
 
     def _convert_date_column(self, series: pd.Series) -> pd.Series:
         """Fast vectorized conversion of mixed serial numbers / text / datetime series."""

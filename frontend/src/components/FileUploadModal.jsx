@@ -56,7 +56,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
 
     // Show status for large files
     if (file.size > 5 * 1024 * 1024) {
-      setUploadStatus('Đang xử lý file theo chunk... (có thể mất 1-2 phút)');
+      setUploadStatus('Đang xử lý file theo streaming chunk... (tối ưu memory)');
     }
 
     try {
@@ -123,7 +123,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100">Upload Dữ Liệu Vận Chuyển SAP</h3>
-            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Hỗ trợ file lên đến 100MB</p>
+            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Streaming chunk processing • Hỗ trợ file lên đến 100MB</p>
           </div>
         </div>
 
