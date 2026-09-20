@@ -79,7 +79,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
       } else if (err.code === 'ERR_NETWORK' || !err.response) {
         errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
       } else if (err.response?.status === 413) {
-        errorMessage = 'File quá lớn. Vui lòng chia nhỏ file hoặc sử dụng file dưới 100MB.';
+        errorMessage = 'File quá lớn cho free tier. Vui lòng chia nhỏ file hoặc sử dụng file dưới 50MB.';
       } else if (err.response?.status === 502) {
         errorMessage = 'Server quá tải. Vui lòng thử lại sau hoặc sử dụng file nhỏ hơn.';
       } else if (err.response?.data?.detail) {
@@ -123,7 +123,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100">Upload Dữ Liệu Vận Chuyển SAP</h3>
-            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Streaming chunk processing • Hỗ trợ file lên đến 100MB</p>
+            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Streaming chunk processing • Hỗ trợ file lên đến 50MB (free tier)</p>
           </div>
         </div>
 

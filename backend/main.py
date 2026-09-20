@@ -40,10 +40,10 @@ async def startup_db_check():
         print("   (Hỗ trợ Đăng nhập & Lưu trữ dữ liệu mượt mà, độc lập)")
     print("🚀 Backend is ready on Render!")
     print("🌐 CORS configured for GitHub Pages and local development")
-    print("📁 File upload limit: 100MB with streaming chunk processing")
+    print("📁 File upload limit: 50MB (free tier) with streaming chunk processing")
     print("⚡ Streaming chunk processing enabled for files > 5MB")
-    print("💾 Memory optimization: openpyxl read_only=True + garbage collection")
-    print("🔧 Chunk size: 2,000 rows (streaming for memory efficiency)")
+    print("💾 Memory optimization: openpyxl read_only=True + batch concatenation")
+    print("🔧 Chunk size: 1,000 rows (streaming for memory efficiency)")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
@@ -105,21 +105,21 @@ async def upload_file(
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file Excel (.xlsx, .xls)")
 
-    # Check file size (limit to 100MB with chunk processing)
+    # Check file size (limit to 50MB for free tier stability)
     file.file.seek(0, 2)  # Seek to end
     file_size = file.file.tell()
     file.file.seek(0)  # Seek back to beginning
 
-    if file_size > 100 * 1024 * 1024:  # 100MB limit
-        raise HTTPException(status_code=413, detail="File quá lớn. Vui lòng upload file dưới 100MB.")
+    if file_size > 50 * 1024 * 1024:  # 50MB limit for free tier
+        raise HTTPException(status_code=413, detail="File quá lớn cho free tier. Vui lòng upload file dưới 50MB hoặc nâng cấp gói dịch vụ.")
 
-    # Warn for very large files
-    if file_size > 50 * 1024 * 1024:  # > 50MB
-        print(f"⚠️ Large file upload detected: {file_size / (1024*1024):.1f}MB - this may take several minutes")
+    # Warn for large files
+    if file_size > 20 * 1024 * 1024:  # > 20MB
+        print(f"⚠️ Large file upload detected: {file_size / (1024*1024):.1f}MB - streaming processing enabled")
 
     # Process in chunks for large files
     if file_size > 5 * 1024 * 1024:  # > 5MB use chunk processing
-        chunk_size = 2000  # Process 2,000 rows at a time (streaming with openpyxl)
+        chunk_size = 1000  # Process 1,000 rows at a time (streaming with openpyxl)
         print(f"⚡ Streaming chunk processing enabled for {file_size / (1024*1024):.1f}MB file")
     else:
         chunk_size = None  # Process full file for small files
@@ -223,7 +223,7 @@ async def select_sheet(
 
     # Determine chunk size based on file size
     file_size = len(contents)
-    chunk_size = 2000 if file_size > 5 * 1024 * 1024 else None
+    chunk_size = 1000 if file_size > 5 * 1024 * 1024 else None
 
     processor = TransportDataProcessor.load_excel(contents, sheet_name=sheet_name, chunk_size=chunk_size)
 

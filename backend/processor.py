@@ -90,7 +90,7 @@ class TransportDataProcessor:
         return excel_file.sheet_names
 
     @classmethod
-    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=2000) -> 'TransportDataProcessor':
+    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=1000) -> 'TransportDataProcessor':
         """Load Excel file with streaming reading using openpyxl read_only=True for memory efficiency."""
         header_row = cls.detect_header_row(file_bytes, sheet_name=sheet_name)
 
@@ -146,12 +146,13 @@ class TransportDataProcessor:
                         chunks.append(chunk_df)
                         chunk_count += 1
 
-                        # Memory cleanup
+                        # Aggressive memory cleanup
                         del current_chunk
                         current_chunk = []
+                        del chunk_df
                         gc.collect()
 
-                        if chunk_count % 5 == 0:
+                        if chunk_count % 10 == 0:
                             print(f"🧹 Processed {chunk_count} chunks ({chunk_count * chunk_size} rows)")
 
                 # Process remaining rows
@@ -165,7 +166,8 @@ class TransportDataProcessor:
 
                 if chunks:
                     print(f"✅ Successfully read {len(chunks)} chunks, concatenating...")
-                    raw_df = pd.concat(chunks, ignore_index=True)
+                    # Concatenate in smaller batches to avoid memory spike
+                    raw_df = cls._concat_chunks_safely(chunks)
                     print(f"✅ Concatenated {len(raw_df)} rows")
                     return cls(raw_df)
                 else:
@@ -187,6 +189,39 @@ class TransportDataProcessor:
             kwargs = {'engine': engine} if engine else {}
             raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
             return cls(raw_df)
+
+    @staticmethod
+    def _concat_chunks_safely(chunks):
+        """Concatenate chunks in batches to avoid memory spike."""
+        if not chunks:
+            return pd.DataFrame()
+
+        if len(chunks) == 1:
+            return chunks[0]
+
+        # Concatenate in batches of 5 chunks to avoid memory spike
+        batch_size = 5
+        result_chunks = []
+
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            batch_result = pd.concat(batch, ignore_index=True)
+            result_chunks.append(batch_result)
+
+            # Cleanup
+            del batch
+            del batch_result
+            gc.collect()
+
+        # Final concatenation
+        if len(result_chunks) == 1:
+            return result_chunks[0]
+
+        final_result = pd.concat(result_chunks, ignore_index=True)
+        del result_chunks
+        gc.collect()
+
+        return final_result
 
     def _convert_date_column(self, series: pd.Series) -> pd.Series:
         """Fast vectorized conversion of mixed serial numbers / text / datetime series."""
