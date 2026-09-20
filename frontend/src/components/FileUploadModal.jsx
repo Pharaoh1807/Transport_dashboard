@@ -53,7 +53,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     formData.append('file', file);
 
     try {
-      const res = await api.post('/upload', formData, {
+      const res = await api.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -75,7 +75,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     setSelectedSheet(sheetName);
     setLoading(true);
     try {
-      const res = await api.post(`/select-sheet/${uploadResult.file_id}?sheet_name=${encodeURIComponent(sheetName)}`);
+      const res = await api.post(`/api/select-sheet/${uploadResult.file_id}?sheet_name=${encodeURIComponent(sheetName)}`);
       onUploadSuccess({ ...uploadResult, ...res.data });
     } catch (err) {
       setError(err.response?.data?.detail || 'Lỗi khi chuyển đổi sheet.');

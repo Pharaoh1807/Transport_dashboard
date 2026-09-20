@@ -47,7 +47,7 @@ const CarrierRoutePanel = ({ carrier, fileId, filters, onClose }) => {
     if (!carrier || !fileId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/carrier-routes/${fileId}`, {
+      const res = await api.get(`/api/carrier-routes/${fileId}`, {
         params: { carrier_name: carrier, group_by: groupBy, ...filters }
       });
       setData(res.data);

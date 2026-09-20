@@ -10,7 +10,7 @@ const AdminModal = ({ isOpen, onClose }) => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/users');
+      const res = await api.get('/api/admin/users');
       setUsers(res.data);
     } catch (err) {
       console.error(err);
@@ -27,7 +27,7 @@ const AdminModal = ({ isOpen, onClose }) => {
 
   const handleApprove = async (userId, isApproved) => {
     try {
-      await api.post('/admin/approve-user', { user_id: userId, is_approved: isApproved });
+      await api.post('/api/admin/approve-user', { user_id: userId, is_approved: isApproved });
       setMessage('Đã cập nhật trạng thái người dùng.');
       fetchUsers();
     } catch (err) {
@@ -38,7 +38,7 @@ const AdminModal = ({ isOpen, onClose }) => {
   const handleDelete = async (userId) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) return;
     try {
-      await api.delete(`/admin/users/${userId}`);
+      await api.delete(`/api/admin/users/${userId}`);
       setMessage('Đã xóa người dùng.');
       fetchUsers();
     } catch (err) {

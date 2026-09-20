@@ -48,7 +48,7 @@ const Dashboard = () => {
   // Fetch cascading filter options
   const fetchFilterOptions = async (fileId, currentFilters) => {
     try {
-      const res = await api.get(`/filters/${fileId}`, { params: currentFilters });
+      const res = await api.get(`/api/filters/${fileId}`, { params: currentFilters });
       setFilterOptions(res.data);
     } catch (err) {
       console.error('Failed to load filter options:', err);
@@ -59,7 +59,7 @@ const Dashboard = () => {
   const fetchDashboardData = async (fileId, currentFilters) => {
     setLoading(true);
     try {
-      const res = await api.get(`/dashboard/${fileId}`, { params: currentFilters });
+      const res = await api.get(`/api/dashboard/${fileId}`, { params: currentFilters });
       setDashboardData(res.data);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -94,7 +94,7 @@ const Dashboard = () => {
 
     setIsDeleting(true);
     try {
-      await api.delete(`/file/${activeFile.file_id}`);
+      await api.delete(`/api/file/${activeFile.file_id}`);
       setActiveFile(null);
       setDashboardData(null);
       setFilterOptions({});
@@ -137,7 +137,7 @@ const Dashboard = () => {
     if (!activeFile?.file_id) return;
     setIsExporting(true);
     try {
-      const response = await api.get(`/export/${activeFile.file_id}`, {
+      const response = await api.get(`/api/export/${activeFile.file_id}`, {
         params: filters,
         responseType: 'blob'
       });

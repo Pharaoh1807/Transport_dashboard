@@ -34,7 +34,7 @@ const RawDataTable = ({ activeFileId, filters }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/table/${activeFileId}`, {
+        const res = await api.get(`/api/table/${activeFileId}`, {
           params: {
             page,
             page_size: pageSize,

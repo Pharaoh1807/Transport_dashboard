@@ -91,7 +91,7 @@ const CarrierRouteTable = ({ carrier, fileId, filters, isDark }) => {
   useEffect(() => {
     if (!carrier || !fileId) return;
     setLoading(true);
-    api.get(`/carrier-routes/${fileId}`, { params: { carrier_name: carrier, group_by: groupBy, ...filters } })
+    api.get(`/api/carrier-routes/${fileId}`, { params: { carrier_name: carrier, group_by: groupBy, ...filters } })
       .then(res => setData(res.data))
       .catch(err => console.error('Failed to load carrier routes:', err))
       .finally(() => setLoading(false));
