@@ -19,10 +19,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Only clear + reload if it's not the login call itself (avoid infinite loop)
+      if (!error.config?.url?.includes('/auth/login')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Reload root — React will show LoginModal since user is null
+        window.location.replace('/');
       }
     }
     return Promise.reject(error);

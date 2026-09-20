@@ -213,7 +213,6 @@ const Dashboard = () => {
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
                 <CarrierRankingChart
                   data={dashboardData?.charts?.carrierRanking}
-                  onCarrierClick={(carrierName) => setSelectedCarrier(carrierName)}
                 />
                 <CarrierProvinceMatrix data={dashboardData?.charts?.carrierProvinceMatrix} />
               </div>

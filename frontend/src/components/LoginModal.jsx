@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Truck, Mail, Lock, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Truck, Mail, Lock, User, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const LoginModal = () => {
   const { login, register } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('remembered_email') || '');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('remembered_email'));
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,6 +27,12 @@ const LoginModal = () => {
         setIsRegister(false);
       } else {
         await login(email, password);
+        // Save / clear remembered email
+        if (rememberMe) {
+          localStorage.setItem('remembered_email', email);
+        } else {
+          localStorage.removeItem('remembered_email');
+        }
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Thao tác thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -98,15 +106,38 @@ const LoginModal = () => {
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950/60 border border-slate-800 focus:border-blue-500 text-slate-200 text-xs rounded-xl pl-9 pr-3 py-2.5 outline-none transition"
+                className="w-full bg-slate-950/60 border border-slate-800 focus:border-blue-500 text-slate-200 text-xs rounded-xl pl-9 pr-10 py-2.5 outline-none transition"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
+
+          {!isRegister && (
+            <div className="flex items-center gap-2">
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-3.5 h-3.5 accent-blue-500 cursor-pointer"
+              />
+              <label htmlFor="remember-me" className="text-xs text-slate-400 cursor-pointer select-none">
+                Ghi nhớ email đăng nhập
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"

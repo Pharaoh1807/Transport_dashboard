@@ -17,19 +17,52 @@ const fmtNum = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v || 0));
 const fmtTons = (v) => fmtNum(v) + ' Tấn';
 const fmtCost = (v) => fmtNum(v) + ' ₫';
 
+// Map SAP province names (normalized) → GeoJSON normalized key
+// GeoJSON normalized keys are from: normalizeName(feature.properties.name)
 const PROVINCE_ALIASES = {
-  'SOUTHEAST': 'DONGNAI',
+  // HCM variants
   'HOCHIMINHCITY': 'HOCHIMINH',
-  'HOCHIMINH': 'HOCHIMINH',
-  'HCM': 'HOCHIMINH',
   'TPHCM': 'HOCHIMINH',
   'TPHOCHIMINH': 'HOCHIMINH',
-  'CANTHO': 'CANTHO',
-  'HAIPHONG': 'HAIPHONG',
-  'DANANG': 'DANANG',
+  'HCM': 'HOCHIMINH',
+  'HCMCITY': 'HOCHIMINH',
+  // Hue — GeoJSON key is HUE (not THUATHIENHUE)
+  'THUATHIENHUE': 'HUE',
+  'THUA THIEN HUE': 'HUE',
+  'THUATHIENHUECITY': 'HUE',
+  // Southeast region in GeoJSON is vn-331, maps to Dong Nai area
+  'SOUTHEAST': 'SOUTHEAST',
+  // Hanoi
   'HANOI': 'HANOI',
-  'HUE': 'THUATHIENHUE',
-  'THUATHIENHUE': 'THUATHIENHUE',
+  'HANOICITY': 'HANOI',
+  // Hai Phong
+  'HAIPHONG': 'HAIPHONG',
+  // Da Nang
+  'DANANG': 'DANANG',
+  'DANANGCITY': 'DANANG',
+  // Can Tho
+  'CANTHO': 'CANTHO',
+  'CANTHOCITY': 'CANTHO',
+  // Dak Lak variants
+  'DAKLAK': 'DAKLAK',
+  'DACLAK': 'DAKLAK',
+  'DAKLAC': 'DAKLAK',
+  // Dak Nong
+  'DAKNONG': 'DAKNONG',
+  'DACNONG': 'DAKNONG',
+  // Quang Nam (typo in GeoJSON: 'Quàng Nam')
+  'QUANGNAM': 'QUANGNAM',
+  // Bac Lieu
+  'BACLIEU': 'BACLIEU',
+  'BACLIE': 'BACLIEU',
+  // Ba Ria - Vung Tau
+  'BARIAVUNGTAU': 'BARIAVUNGTAU',
+  'VUNGTAU': 'BARIAVUNGTAU',
+  'BARIA': 'BARIAVUNGTAU',
+  // Binh Duong
+  'BINHDUONG': 'BINHDUONG',
+  // Dong Nai
+  'DONGNAI': 'DONGNAI',
 };
 
 // Normalize province names for fuzzy matching between SAP data and GeoJSON
@@ -40,7 +73,7 @@ const normalizeName = (text) => {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd').replace(/Đ/g, 'D')
     .toUpperCase()
-    .replace(/^(TINH|TP|TP\.|THANH PHO|TT\.|TT|CITY)[\s\.]*/i, '')
+    .replace(/^(TINH|TP\.?|THANH PHO|TT\.?|CITY)[\s\.]*/i, '')
     .replace(/[\s\.]*CITY$/i, '')
     .replace(/[^A-Z0-9]/g, '');
   return PROVINCE_ALIASES[str] || str;
@@ -225,6 +258,7 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   const [selectedCarrier, setSelectedCarrier] = useState('ALL');
   const [tooltipContent, setTooltipContent] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [hoveredKey, setHoveredKey] = useState(null);
 
   const provincesData = useMemo(() => data?.provinces || [], [data]);
   const topCarriers = useMemo(() => data?.top_carriers || [], [data]);
@@ -248,14 +282,27 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
     provincesData.forEach(p => {
       const norm = normalizeName(p.province);
       if (norm) map.set(norm, p);
+      // Also store original name as fallback
+      const origNorm = p.province?.toString().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (origNorm && origNorm !== norm) map.set(origNorm, p);
     });
     return map;
   }, [provincesData]);
 
   const getProvinceInfo = useCallback((geoProperties) => {
-    const geoName = geoProperties.name || geoProperties['woe-name'] || geoProperties.NAME_1 || geoProperties.VARNAME_1 || '';
-    const norm = normalizeName(geoName);
-    return provinceLookupMap.get(norm) || null;
+    // Try matching by normalized name from multiple GeoJSON properties
+    const candidates = [
+      geoProperties.name,
+      geoProperties['woe-name'],
+      geoProperties.NAME_1,
+      geoProperties.VARNAME_1
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      const norm = normalizeName(candidate);
+      if (provinceLookupMap.has(norm)) return provinceLookupMap.get(norm);
+    }
+    return null;
   }, [provinceLookupMap]);
 
   // Audit province matching on data update
@@ -284,25 +331,49 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   }, [provincesData]);
 
   const getGeoFillColor = (pInfo) => {
-    if (!pInfo || pInfo.total_tons === 0) return isDark ? '#334155' : '#cbd5e1';
+    // No data for this province
+    if (!pInfo || pInfo.total_tons === 0) return isDark ? '#1e3a5f' : '#dde8f5';
     const carrierEntries = Object.entries(pInfo.carriers || {});
-    if (carrierEntries.length === 0) return isDark ? '#334155' : '#cbd5e1';
+    if (carrierEntries.length === 0) return isDark ? '#1e3a5f' : '#dde8f5';
 
     const dominantCarrier = carrierEntries.sort((a, b) => b[1] - a[1])[0][0];
 
     if (selectedCarrier !== 'ALL') {
       const hasCarrier = pInfo.carriers && pInfo.carriers[selectedCarrier];
       if (hasCarrier) return carrierColorMap[selectedCarrier] || '#3b82f6';
-      return isDark ? '#334155' : '#cbd5e1'; // Visible slate gray when not served by selected carrier
+      return isDark ? '#1e3a5f' : '#dde8f5';
     }
     return carrierColorMap[dominantCarrier] || '#3b82f6';
   };
 
   const getGeoOpacity = (pInfo) => {
-    if (selectedCarrier === 'ALL') return 1.0; // Solid non-transparent fill
-    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.45; // Dimmed gray when carrier selected
+    if (selectedCarrier === 'ALL') return 1.0;
+    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.35;
     return 1.0;
   };
+
+  // Count matched provinces for debug
+  const [matchedCount, setMatchedCount] = useState(null);
+  useEffect(() => {
+    if (provincesData.length === 0) { setMatchedCount(null); return; }
+    fetch(GEO_URL)
+      .then(r => r.json())
+      .then(geo => {
+        const geoNormSet = new Set(geo.features.flatMap(f => [
+          normalizeName(f.properties.name),
+          normalizeName(f.properties['woe-name'] || '')
+        ].filter(Boolean)));
+        const matched = provincesData.filter(p => geoNormSet.has(normalizeName(p.province))).length;
+        setMatchedCount({ matched, total: provincesData.length });
+        const unmatched = provincesData.filter(p => !geoNormSet.has(normalizeName(p.province)));
+        if (unmatched.length > 0) {
+          console.warn('⚠️ Unmatched provinces:', unmatched.map(u => `${u.province} -> ${normalizeName(u.province)}`));
+        } else {
+          console.log('✅ All provinces matched!');
+        }
+      })
+      .catch(() => {});
+  }, [provincesData]);
 
   const muted = isDark ? 'text-slate-400' : 'text-slate-500';
 
@@ -364,8 +435,18 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
         {/* Map (without overflow-hidden so tooltips are never clipped) */}
         <div
           className="lg:col-span-8 flex justify-center relative rounded-2xl border"
-          style={{ backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#475569' : '#cbd5e1' }}
+          style={{ backgroundColor: isDark ? '#0f2744' : '#e8f0fb', borderColor: isDark ? '#1e40af' : '#93c5fd' }}
         >
+          {/* Debug badge */}
+          {matchedCount && (
+            <div className={`absolute top-2 left-2 z-10 px-2 py-1 rounded-lg text-[10px] font-bold ${
+              matchedCount.matched === matchedCount.total
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'bg-amber-500/20 text-amber-400'
+            }`}>
+              ✓ {matchedCount.matched}/{matchedCount.total} tỉnh khớp bản đồ
+            </div>
+          )}
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{ center: [107.5, 16.2], scale: 2400 }}
@@ -375,13 +456,19 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
               {({ geographies }) =>
                 geographies.map(geo => {
                   const pInfo = getProvinceInfo(geo.properties);
-                  const fillColor = getGeoFillColor(pInfo);
-                  const opacity = getGeoOpacity(pInfo);
+                  const isHovered = hoveredKey === geo.rsmKey;
+                  const fillColor = isHovered ? '#f59e0b' : getGeoFillColor(pInfo);
+                  const opacity = isHovered ? 1 : getGeoOpacity(pInfo);
 
                   return (
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
+                      fill={fillColor}
+                      fillOpacity={opacity}
+                      stroke="#ffffff"
+                      strokeWidth={isHovered ? 2.5 : 1.2}
+                      onMouseEnter={() => setHoveredKey(geo.rsmKey)}
                       onMouseMove={evt => {
                         const rect = evt.currentTarget.closest('svg').getBoundingClientRect();
                         const relX = evt.clientX - rect.left;
@@ -391,26 +478,11 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
                         setTooltipPos({ x: leftX, y: topY });
                         setTooltipContent({ name: geo.properties.name || geo.properties['woe-name'] || '?', info: pInfo });
                       }}
-                      onMouseLeave={() => setTooltipContent(null)}
-                      style={{
-                        default: {
-                          fill: fillColor,
-                          fillOpacity: opacity,
-                          stroke: '#ffffff',
-                          strokeWidth: 1.5,
-                          outline: 'none',
-                          transition: 'fill 200ms, fill-opacity 200ms'
-                        },
-                        hover: {
-                          fill: '#f59e0b',
-                          fillOpacity: 1,
-                          stroke: '#ffffff',
-                          strokeWidth: 2.5,
-                          outline: 'none',
-                          cursor: 'pointer'
-                        },
-                        pressed: { fill: '#d97706', outline: 'none' }
+                      onMouseLeave={() => {
+                        setHoveredKey(null);
+                        setTooltipContent(null);
                       }}
+                      style={{ outline: 'none', cursor: 'pointer', transition: 'fill 160ms, fill-opacity 160ms' }}
                     />
                   );
                 })
