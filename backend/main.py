@@ -38,6 +38,7 @@ async def startup_db_check():
     else:
         print(f"✅ [Database] Đang sử dụng lưu trữ cục bộ SQLite: {get_db_path()}")
         print("   (Hỗ trợ Đăng nhập & Lưu trữ dữ liệu mượt mà, độc lập)")
+    print("🚀 Backend is ready on Render!")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
