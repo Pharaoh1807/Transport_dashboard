@@ -88,15 +88,23 @@ class TransportDataProcessor:
         return excel_file.sheet_names
 
     @classmethod
-    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=10000) -> 'TransportDataProcessor':
+    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=5000) -> 'TransportDataProcessor':
         """Load Excel file with chunk processing for large files."""
         header_row = cls.detect_header_row(file_bytes, sheet_name=sheet_name)
         engine = cls._get_engine(file_bytes)
         kwargs = {'engine': engine} if engine else {}
 
+        # If chunk_size is None, use full read
+        if chunk_size is None:
+            print("📖 Using full read (no chunking)")
+            raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
+            return cls(raw_df)
+
         try:
+            print(f"🔄 Attempting chunk reading with chunk_size={chunk_size}")
             # Try chunk reading if supported
             chunks = []
+            chunk_count = 0
             for chunk in pd.read_excel(
                 io.BytesIO(file_bytes),
                 sheet_name=sheet_name,
@@ -105,18 +113,25 @@ class TransportDataProcessor:
                 **kwargs
             ):
                 chunks.append(chunk)
-                # Clear memory periodically
-                if len(chunks) % 5 == 0:
+                chunk_count += 1
+                # Clear memory more frequently
+                if chunk_count % 3 == 0:
                     import gc
                     gc.collect()
+                    print(f"🧹 Memory cleanup after chunk {chunk_count}")
 
             if chunks:
+                print(f"✅ Successfully read {len(chunks)} chunks, concatenating...")
                 raw_df = pd.concat(chunks, ignore_index=True)
+                print(f"✅ Concatenated {len(raw_df)} rows")
                 return cls(raw_df)
         except Exception as e:
-            print(f"Chunk reading failed: {e}, falling back to full read")
+            print(f"⚠️ Chunk reading failed: {e}, falling back to full read")
+            import gc
+            gc.collect()
 
         # Fallback to full read for small files or unsupported engines
+        print("📖 Fallback to full read")
         raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
         return cls(raw_df)
 

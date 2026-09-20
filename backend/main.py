@@ -41,8 +41,9 @@ async def startup_db_check():
     print("🚀 Backend is ready on Render!")
     print("🌐 CORS configured for GitHub Pages and local development")
     print("📁 File upload limit: 100MB with chunk processing")
-    print("⚡ Chunk processing enabled for files > 10MB")
+    print("⚡ Chunk processing enabled for files > 5MB (optimized)")
     print("💾 Memory optimization: Automatic garbage collection enabled")
+    print("🔧 Chunk size: 5,000 rows (reduced for stability)")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
@@ -117,8 +118,8 @@ async def upload_file(
         print(f"⚠️ Large file upload detected: {file_size / (1024*1024):.1f}MB - this may take several minutes")
 
     # Process in chunks for large files
-    if file_size > 10 * 1024 * 1024:  # > 10MB use chunk processing
-        chunk_size = 10000  # Process 10,000 rows at a time
+    if file_size > 5 * 1024 * 1024:  # > 5MB use chunk processing (reduced from 10MB)
+        chunk_size = 5000  # Process 5,000 rows at a time (reduced from 10,000)
         print(f"⚡ Chunk processing enabled for {file_size / (1024*1024):.1f}MB file")
     else:
         chunk_size = None  # Process full file for small files
@@ -184,13 +185,15 @@ async def upload_file(
                             r[k] = v.item()
 
                 # Use smaller chunks for large datasets to avoid memory issues
-                db_chunk_size = 1000 if len(recs) > 10000 else 2500
+                db_chunk_size = 500 if len(recs) > 5000 else 1000 if len(recs) > 10000 else 2500
+                print(f"💾 Using db_chunk_size={db_chunk_size} for {len(recs)} records")
                 for i in range(0, len(recs), db_chunk_size):
                     await db.records.insert_many(recs[i:i+db_chunk_size])
-                    # Clear memory periodically
-                    if i % (db_chunk_size * 5) == 0:
+                    # Clear memory more frequently
+                    if i % (db_chunk_size * 3) == 0:
                         import gc
                         gc.collect()
+                        print(f"🧹 Memory cleanup after {i} records")
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 
@@ -221,7 +224,7 @@ async def select_sheet(
 
     # Determine chunk size based on file size
     file_size = len(contents)
-    chunk_size = 10000 if file_size > 10 * 1024 * 1024 else None
+    chunk_size = 5000 if file_size > 5 * 1024 * 1024 else None
 
     processor = TransportDataProcessor.load_excel(contents, sheet_name=sheet_name, chunk_size=chunk_size)
 
@@ -251,13 +254,15 @@ async def select_sheet(
                             r[k] = v.item()
 
                 # Use smaller chunks for large datasets
-                db_chunk_size = 1000 if len(recs) > 10000 else 2500
+                db_chunk_size = 500 if len(recs) > 5000 else 1000 if len(recs) > 10000 else 2500
+                print(f"💾 Using db_chunk_size={db_chunk_size} for {len(recs)} records (sheet change)")
                 for i in range(0, len(recs), db_chunk_size):
                     await db.records.insert_many(recs[i:i+db_chunk_size])
-                    # Clear memory periodically
-                    if i % (db_chunk_size * 5) == 0:
+                    # Clear memory more frequently
+                    if i % (db_chunk_size * 3) == 0:
                         import gc
                         gc.collect()
+                        print(f"🧹 Memory cleanup after {i} records (sheet change)")
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 

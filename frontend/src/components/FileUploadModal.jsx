@@ -55,8 +55,8 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     formData.append('file', file);
 
     // Show status for large files
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadStatus('Đang xử lý file lớn theo chunk... (có thể mất vài phút)');
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadStatus('Đang xử lý file theo chunk... (có thể mất 1-2 phút)');
     }
 
     try {
