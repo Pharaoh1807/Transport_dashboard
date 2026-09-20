@@ -17,11 +17,10 @@ from processor import TransportDataProcessor
 app = FastAPI(title="SAP Transportation Data Analysis API", version="2.0.0")
 
 # CORS middleware
-# In production, replace "*" with specific origins like:
-# ["https://pharaoh1807.github.io", "http://localhost:3000"]
+# Allow GitHub Pages and local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now, will restrict later
+    allow_origins=["https://pharaoh1807.github.io", "http://localhost:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,6 +38,7 @@ async def startup_db_check():
         print(f"✅ [Database] Đang sử dụng lưu trữ cục bộ SQLite: {get_db_path()}")
         print("   (Hỗ trợ Đăng nhập & Lưu trữ dữ liệu mượt mà, độc lập)")
     print("🚀 Backend is ready on Render!")
+    print("🌐 CORS configured for GitHub Pages and local development")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
