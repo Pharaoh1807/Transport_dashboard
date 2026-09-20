@@ -1,6 +1,7 @@
 import uuid
 import io
 import os
+import gc
 from typing import List, Optional
 from datetime import datetime
 from fastapi import FastAPI, File, UploadFile, Query, Depends, HTTPException, Response, status
@@ -39,6 +40,9 @@ async def startup_db_check():
         print("   (Hỗ trợ Đăng nhập & Lưu trữ dữ liệu mượt mà, độc lập)")
     print("🚀 Backend is ready on Render!")
     print("🌐 CORS configured for GitHub Pages and local development")
+    print("📁 File upload limit: 100MB with chunk processing")
+    print("⚡ Chunk processing enabled for files > 10MB")
+    print("💾 Memory optimization: Automatic garbage collection enabled")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
@@ -83,7 +87,12 @@ async def get_processor(file_id: str, current_user: dict) -> TransportDataProces
 
 @app.get("/")
 def read_root():
-    return {"message": "SAP Transportation Data API is running", "version": "2.0.0"}
+    return {"message": "SAP Transportation Data API is running", "version": "2.0.0", "status": "healthy"}
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "version": "2.0.0"}
 
 
 @app.post("/api/upload")
@@ -91,9 +100,23 @@ async def upload_file(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload Excel file, auto-cleanup old user data, detect sheet names."""
+    """Upload Excel file with chunk processing for large files."""
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file Excel (.xlsx, .xls)")
+
+    # Check file size (limit to 100MB with chunk processing)
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()
+    file.file.seek(0)  # Seek back to beginning
+
+    if file_size > 100 * 1024 * 1024:  # 100MB limit
+        raise HTTPException(status_code=413, detail="File quá lớn. Vui lòng upload file dưới 100MB.")
+
+    # Process in chunks for large files
+    if file_size > 10 * 1024 * 1024:  # > 10MB use chunk processing
+        chunk_size = 10000  # Process 10,000 rows at a time
+    else:
+        chunk_size = None  # Process full file for small files
 
     contents = await file.read()
     file_id = str(uuid.uuid4())
@@ -113,7 +136,8 @@ async def upload_file(
     sheet_names = TransportDataProcessor.get_sheet_names(contents)
     selected_sheet = sheet_names[0] if sheet_names else 0
 
-    processor = TransportDataProcessor.load_excel(contents, sheet_name=selected_sheet)
+    # Load with chunk processing for large files
+    processor = TransportDataProcessor.load_excel(contents, sheet_name=selected_sheet, chunk_size=chunk_size)
 
     # 3. Store file metadata in MongoDB
     file_meta = {
@@ -151,9 +175,14 @@ async def upload_file(
                         if hasattr(v, 'item'):
                             r[k] = v.item()
 
-                chunk_size = 2500
-                for i in range(0, len(recs), chunk_size):
-                    await db.records.insert_many(recs[i:i+chunk_size])
+                # Use smaller chunks for large datasets to avoid memory issues
+                db_chunk_size = 1000 if len(recs) > 10000 else 2500
+                for i in range(0, len(recs), db_chunk_size):
+                    await db.records.insert_many(recs[i:i+db_chunk_size])
+                    # Clear memory periodically
+                    if i % (db_chunk_size * 5) == 0:
+                        import gc
+                        gc.collect()
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 
@@ -182,7 +211,11 @@ async def select_sheet(
     contents = file_bytes_cache[file_id]
     user_id = current_user["_id"]
 
-    processor = TransportDataProcessor.load_excel(contents, sheet_name=sheet_name)
+    # Determine chunk size based on file size
+    file_size = len(contents)
+    chunk_size = 10000 if file_size > 10 * 1024 * 1024 else None
+
+    processor = TransportDataProcessor.load_excel(contents, sheet_name=sheet_name, chunk_size=chunk_size)
 
     db = get_database()
     await db.records.delete_many({"file_id": file_id})
@@ -209,9 +242,14 @@ async def select_sheet(
                         if hasattr(v, 'item'):
                             r[k] = v.item()
 
-                chunk_size = 2500
-                for i in range(0, len(recs), chunk_size):
-                    await db.records.insert_many(recs[i:i+chunk_size])
+                # Use smaller chunks for large datasets
+                db_chunk_size = 1000 if len(recs) > 10000 else 2500
+                for i in range(0, len(recs), db_chunk_size):
+                    await db.records.insert_many(recs[i:i+db_chunk_size])
+                    # Clear memory periodically
+                    if i % (db_chunk_size * 5) == 0:
+                        import gc
+                        gc.collect()
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 

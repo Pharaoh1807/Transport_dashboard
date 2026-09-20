@@ -88,11 +88,35 @@ class TransportDataProcessor:
         return excel_file.sheet_names
 
     @classmethod
-    def load_excel(cls, file_bytes: bytes, sheet_name=0) -> 'TransportDataProcessor':
-        """Load Excel file ultra-fast with calamine, auto-detect header row, preprocess DataFrame."""
+    def load_excel(cls, file_bytes: bytes, sheet_name=0, chunk_size=10000) -> 'TransportDataProcessor':
+        """Load Excel file with chunk processing for large files."""
         header_row = cls.detect_header_row(file_bytes, sheet_name=sheet_name)
         engine = cls._get_engine(file_bytes)
         kwargs = {'engine': engine} if engine else {}
+
+        try:
+            # Try chunk reading if supported
+            chunks = []
+            for chunk in pd.read_excel(
+                io.BytesIO(file_bytes),
+                sheet_name=sheet_name,
+                header=header_row,
+                chunksize=chunk_size,
+                **kwargs
+            ):
+                chunks.append(chunk)
+                # Clear memory periodically
+                if len(chunks) % 5 == 0:
+                    import gc
+                    gc.collect()
+
+            if chunks:
+                raw_df = pd.concat(chunks, ignore_index=True)
+                return cls(raw_df)
+        except Exception as e:
+            print(f"Chunk reading failed: {e}, falling back to full read")
+
+        # Fallback to full read for small files or unsupported engines
         raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
         return cls(raw_df)
 

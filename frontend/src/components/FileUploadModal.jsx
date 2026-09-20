@@ -9,6 +9,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
   const [uploadResult, setUploadResult] = useState(null);
   const [selectedSheet, setSelectedSheet] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(''); // Add status message
 
   // Reset state when modal is opened
   useEffect(() => {
@@ -48,9 +49,15 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
     setLoading(true);
     setUploadProgress(0);
     setError('');
+    setUploadStatus('');
 
     const formData = new FormData();
     formData.append('file', file);
+
+    // Show status for large files
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadStatus('Đang xử lý file lớn theo chunk... (có thể mất vài phút)');
+    }
 
     try {
       const res = await api.post('/api/upload', formData, {
@@ -101,7 +108,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-100">Upload Dữ Liệu Vận Chuyển SAP</h3>
-            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date</p>
+            <p className="text-xs text-slate-400">Đọc tự động header dòng 5 & số serial date • Hỗ trợ file lên đến 100MB</p>
           </div>
         </div>
 
@@ -153,7 +160,7 @@ const FileUploadModal = ({ isOpen, onClose, onUploadSuccess }) => {
                   <p className="text-[11px] text-slate-400 mt-1.5 animate-pulse">
                     {uploadProgress < 100
                       ? `Đang tải file lên server: ${uploadProgress}%`
-                      : `Đang đọc dữ liệu Excel bằng engine Calamine siêu tốc...`}
+                      : uploadStatus || `Đang đọc dữ liệu Excel bằng engine Calamine siêu tốc...`}
                   </p>
                 )}
               </div>
