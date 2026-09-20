@@ -42,13 +42,14 @@ async def startup_db_check():
     print("🌐 CORS configured for GitHub Pages and local development")
     print("📁 File upload limit: 50MB (free tier) with streaming chunk processing")
     print("⚡ Streaming chunk processing enabled for files > 5MB")
-    print("💾 Memory optimization: openpyxl read_only=True + batch concatenation")
+    print("💾 Memory optimization: openpyxl read_only=True + chunked DB insertion")
     print("🔧 Chunk size: 1,000 rows (streaming for memory efficiency)")
+    print("🧹 Memory cache: Global latest file only (not per-user)")
 
 # In-memory RAM cache for DataProcessors indexed by file_id
 data_cache = {}
-# File bytes cache indexed by file_id for quick re-processing on sheet change
-file_bytes_cache = {}
+# Limited file bytes cache - only keep most recent file globally to save memory
+_file_bytes_cache = {"latest_file_id": None, "contents": None}
 
 
 async def get_processor(file_id: str, current_user: dict) -> TransportDataProcessor:
@@ -135,7 +136,10 @@ async def upload_file(
         old_id = old_file["_id"]
         await db.records.delete_many({"file_id": old_id})
         data_cache.pop(old_id, None)
-        file_bytes_cache.pop(old_id, None)
+        # Clear global file bytes cache if this was the latest file
+        if _file_bytes_cache["latest_file_id"] == old_id:
+            _file_bytes_cache["latest_file_id"] = None
+            _file_bytes_cache["contents"] = None
     await db.files.delete_many({"user_id": user_id})
 
     # 2. Get sheet names & load default sheet 0
@@ -165,34 +169,52 @@ async def upload_file(
         "processor": processor,
         "user_id": user_id
     }
-    file_bytes_cache[file_id] = contents
+    # Cache only the latest file bytes globally for sheet switching (memory efficient)
+    _file_bytes_cache["latest_file_id"] = file_id
+    _file_bytes_cache["contents"] = contents
+    print(f"💾 File processed: {len(processor.df)} rows, raw bytes cached as latest file")
 
     # 5. Async background task to persist records without blocking the user
     async def _async_persist_records(f_id: str, df_data: pd.DataFrame):
         try:
-            clean_df = df_data.copy()
-            for col in clean_df.select_dtypes(include=['datetime', 'datetime64', 'datetimetz']).columns:
-                clean_df[col] = clean_df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+            total_rows = len(df_data)
+            db_chunk_size = 250 if total_rows > 5000 else 500 if total_rows > 10000 else 1000
+            datetime_cols = df_data.select_dtypes(include=['datetime', 'datetime64', 'datetimetz']).columns
 
-            clean_df = clean_df.replace({np.nan: None})
-            recs = clean_df.to_dict('records')
+            print(f"💾 Starting chunked DB insertion: {total_rows} rows, chunk_size={db_chunk_size}")
 
-            if recs:
+            for start in range(0, total_rows, db_chunk_size):
+                # Only process and convert SMALL CHUNK at a time, not entire df
+                chunk_df = df_data.iloc[start:start + db_chunk_size].copy()
+
+                # Convert datetime columns
+                for col in datetime_cols:
+                    chunk_df[col] = chunk_df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+
+                # Replace NaN with None
+                chunk_df = chunk_df.replace({np.nan: None})
+
+                # Convert to dict - only for this small chunk
+                recs = chunk_df.to_dict('records')
+
+                # Add file_id and handle item()
                 for r in recs:
                     r['file_id'] = f_id
                     for k, v in r.items():
                         if hasattr(v, 'item'):
                             r[k] = v.item()
 
-                # Use smaller chunks for large datasets to avoid memory issues
-                db_chunk_size = 250 if len(recs) > 5000 else 500 if len(recs) > 10000 else 1000
-                print(f"💾 Using db_chunk_size={db_chunk_size} for {len(recs)} records")
-                for i in range(0, len(recs), db_chunk_size):
-                    await db.records.insert_many(recs[i:i+db_chunk_size])
-                    # Clear memory more frequently
-                    if i % (db_chunk_size * 5) == 0:
-                        gc.collect()
-                        print(f"🧹 Memory cleanup after {i} records")
+                # Insert this chunk
+                await db.records.insert_many(recs)
+
+                # Cleanup memory immediately
+                del chunk_df, recs
+                if start % (db_chunk_size * 5) == 0:
+                    gc.collect()
+                    print(f"🧹 Memory cleanup after {start} records")
+
+            print(f"✅ Completed DB insertion for {total_rows} records")
+
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 
@@ -214,11 +236,15 @@ async def select_sheet(
     sheet_name: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Re-load dataset with selected sheet name."""
-    if file_id not in file_bytes_cache:
-        raise HTTPException(status_code=400, detail="File session đã hết hạn. Vui lòng upload lại file.")
+    """Re-load dataset with selected sheet name (requires re-upload for memory efficiency)."""
+    # Check if this is the latest cached file
+    if _file_bytes_cache["latest_file_id"] != file_id or _file_bytes_cache["contents"] is None:
+        raise HTTPException(
+            status_code=400,
+            detail="File session đã hết hạn để tiết kiệm memory. Vui lòng upload lại file để đổi sheet."
+        )
 
-    contents = file_bytes_cache[file_id]
+    contents = _file_bytes_cache["contents"]
     user_id = current_user["_id"]
 
     # Determine chunk size based on file size
@@ -238,29 +264,44 @@ async def select_sheet(
 
     async def _async_persist_sheet_records(f_id: str, df_data: pd.DataFrame):
         try:
-            clean_df = df_data.copy()
-            for col in clean_df.select_dtypes(include=['datetime', 'datetime64', 'datetimetz']).columns:
-                clean_df[col] = clean_df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+            total_rows = len(df_data)
+            db_chunk_size = 250 if total_rows > 5000 else 500 if total_rows > 10000 else 1000
+            datetime_cols = df_data.select_dtypes(include=['datetime', 'datetime64', 'datetimetz']).columns
 
-            clean_df = clean_df.replace({np.nan: None})
-            recs = clean_df.to_dict('records')
+            print(f"💾 Starting chunked DB insertion (sheet change): {total_rows} rows, chunk_size={db_chunk_size}")
 
-            if recs:
+            for start in range(0, total_rows, db_chunk_size):
+                # Only process and convert SMALL CHUNK at a time
+                chunk_df = df_data.iloc[start:start + db_chunk_size].copy()
+
+                # Convert datetime columns
+                for col in datetime_cols:
+                    chunk_df[col] = chunk_df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('')
+
+                # Replace NaN with None
+                chunk_df = chunk_df.replace({np.nan: None})
+
+                # Convert to dict - only for this small chunk
+                recs = chunk_df.to_dict('records')
+
+                # Add file_id and handle item()
                 for r in recs:
                     r['file_id'] = f_id
                     for k, v in r.items():
                         if hasattr(v, 'item'):
                             r[k] = v.item()
 
-                # Use smaller chunks for large datasets
-                db_chunk_size = 250 if len(recs) > 5000 else 500 if len(recs) > 10000 else 1000
-                print(f"💾 Using db_chunk_size={db_chunk_size} for {len(recs)} records (sheet change)")
-                for i in range(0, len(recs), db_chunk_size):
-                    await db.records.insert_many(recs[i:i+db_chunk_size])
-                    # Clear memory more frequently
-                    if i % (db_chunk_size * 5) == 0:
-                        gc.collect()
-                        print(f"🧹 Memory cleanup after {i} records (sheet change)")
+                # Insert this chunk
+                await db.records.insert_many(recs)
+
+                # Cleanup memory immediately
+                del chunk_df, recs
+                if start % (db_chunk_size * 5) == 0:
+                    gc.collect()
+                    print(f"🧹 Memory cleanup after {start} records (sheet change)")
+
+            print(f"✅ Completed DB insertion for {total_rows} records (sheet change)")
+
         except Exception as err:
             print(f"⚠️ [Background Sync Warning] Persistent record sync error: {err}")
 
@@ -420,7 +461,10 @@ async def delete_file(
 
     # 3. Xóa triệt để khỏi bộ nhớ RAM cache
     data_cache.pop(file_id, None)
-    file_bytes_cache.pop(file_id, None)
+    # Clear global file bytes cache if this was the latest file
+    if _file_bytes_cache["latest_file_id"] == file_id:
+        _file_bytes_cache["latest_file_id"] = None
+        _file_bytes_cache["contents"] = None
 
     return {
         "message": "Đã xóa toàn bộ dữ liệu file thành công.",

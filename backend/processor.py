@@ -104,7 +104,7 @@ class TransportDataProcessor:
 
         # Use openpyxl read_only=True for streaming (memory-efficient)
         try:
-            print(f"🔄 Using openpyxl streaming read with chunk_size={chunk_size}")
+            print(f"🔄 Using openpyxl streaming read (single DataFrame creation)")
 
             # Save bytes to temp file for openpyxl
             import tempfile
@@ -125,11 +125,9 @@ class TransportDataProcessor:
                 # Read header row
                 header_row_idx = header_row + 1  # openpyxl is 1-indexed
                 headers = None
-                chunks = []
-                chunk_count = 0
+                current_rows = []
 
                 print(f"📋 Reading data starting from row {header_row_idx + 1}...")
-                current_chunk = []
 
                 for i, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
                     if i == 0:
@@ -138,41 +136,25 @@ class TransportDataProcessor:
                         print(f"📋 Headers detected: {headers[:5]}...")
                         continue
 
-                    current_chunk.append(row)
+                    current_rows.append(row)
 
-                    # Process chunk when it reaches chunk_size
-                    if len(current_chunk) >= chunk_size:
-                        chunk_df = pd.DataFrame(current_chunk, columns=headers)
-                        chunks.append(chunk_df)
-                        chunk_count += 1
-
-                        # Aggressive memory cleanup
-                        del current_chunk
-                        current_chunk = []
-                        del chunk_df
+                    # Memory cleanup periodically
+                    if len(current_rows) % 10000 == 0:
                         gc.collect()
-
-                        if chunk_count % 10 == 0:
-                            print(f"🧹 Processed {chunk_count} chunks ({chunk_count * chunk_size} rows)")
-
-                # Process remaining rows
-                if current_chunk:
-                    chunk_df = pd.DataFrame(current_chunk, columns=headers)
-                    chunks.append(chunk_df)
-                    del current_chunk
-                    gc.collect()
 
                 wb.close()
 
-                if chunks:
-                    print(f"✅ Successfully read {len(chunks)} chunks, concatenating...")
-                    # Concatenate in smaller batches to avoid memory spike
-                    raw_df = cls._concat_chunks_safely(chunks)
-                    print(f"✅ Concatenated {len(raw_df)} rows")
-                    return cls(raw_df)
-                else:
-                    print("⚠️ No data chunks found, falling back to pandas")
+                if not current_rows:
+                    print("⚠️ No data found in streaming read, falling back to pandas")
                     raise ValueError("No data found in streaming read")
+
+                print(f"✅ Collected {len(current_rows)} rows, creating single DataFrame...")
+                raw_df = pd.DataFrame(current_rows, columns=headers)
+                del current_rows
+                gc.collect()
+                print(f"✅ Created DataFrame with {len(raw_df)} rows")
+
+                return cls(raw_df)
 
             finally:
                 # Clean up temp file
@@ -189,39 +171,6 @@ class TransportDataProcessor:
             kwargs = {'engine': engine} if engine else {}
             raw_df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row, **kwargs)
             return cls(raw_df)
-
-    @staticmethod
-    def _concat_chunks_safely(chunks):
-        """Concatenate chunks in batches to avoid memory spike."""
-        if not chunks:
-            return pd.DataFrame()
-
-        if len(chunks) == 1:
-            return chunks[0]
-
-        # Concatenate in batches of 5 chunks to avoid memory spike
-        batch_size = 5
-        result_chunks = []
-
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
-            batch_result = pd.concat(batch, ignore_index=True)
-            result_chunks.append(batch_result)
-
-            # Cleanup
-            del batch
-            del batch_result
-            gc.collect()
-
-        # Final concatenation
-        if len(result_chunks) == 1:
-            return result_chunks[0]
-
-        final_result = pd.concat(result_chunks, ignore_index=True)
-        del result_chunks
-        gc.collect()
-
-        return final_result
 
     def _convert_date_column(self, series: pd.Series) -> pd.Series:
         """Fast vectorized conversion of mixed serial numbers / text / datetime series."""
@@ -252,7 +201,7 @@ class TransportDataProcessor:
 
     def _preprocess(self, raw_df: pd.DataFrame) -> pd.DataFrame:
         """Standardize column names, data types, clean text, and parse dates."""
-        df = raw_df.copy()
+        df = raw_df  # Remove .copy() to save memory
 
         # Map column names
         column_rename = {}
@@ -399,6 +348,10 @@ class TransportDataProcessor:
                 filtered_df = filtered_df[filtered_df['plan_issue_date'] <= e_dt]
             except Exception:
                 pass
+
+        # Limit cache size to prevent memory leak
+        if len(self._filter_cache) > 20:
+            self._filter_cache.pop(next(iter(self._filter_cache)))
 
         self._filter_cache[filter_key] = filtered_df
         return filtered_df
