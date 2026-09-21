@@ -262,6 +262,9 @@ const PROVINCE_ALIASES = {
   // Dak Nong
   'DAKNONG': 'DAKNONG',
   'DACNONG': 'DAKNONG',
+  'DAK NONG': 'DAKNONG',
+  'DĂK NÔNG': 'DAKNONG',
+  'ĐĂK NÔNG': 'DAKNONG',
   // Quang Nam (typo in GeoJSON: 'Quàng Nam')
   'QUANGNAM': 'QUANGNAM',
   // Bac Lieu

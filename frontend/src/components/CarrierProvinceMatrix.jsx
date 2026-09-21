@@ -98,7 +98,7 @@ const CarrierProvinceMatrix = ({ data }) => {
       </div>
 
       {/* Heatmap Matrix Table */}
-      <div className="overflow-x-auto max-h-[840px]">
+      <div className="overflow-x-auto max-h-[1200px]">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>
