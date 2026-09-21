@@ -297,12 +297,12 @@ const PROVINCE_ALIASES = {
   'DAKLAK': 'DAKLAK',
   'DACLAK': 'DAKLAK',
   'DAKLAC': 'DAKLAK',
-  // Dak Nong
-  'DAKNONG': 'DAKNONG',
-  'DACNONG': 'DAKNONG',
-  'DAK NONG': 'DAKNONG',
-  'DĂK NÔNG': 'DAKNONG',
-  'ĐĂK NÔNG': 'DAKNONG',
+  // Dak Nong - map directly to LAM DONG since Dak Nong merged into Lam Dong
+  'DAKNONG': 'LAM DONG',
+  'DACNONG': 'LAM DONG',
+  'DAK NONG': 'LAM DONG',
+  'DĂK NÔNG': 'LAM DONG',
+  'ĐĂK NÔNG': 'LAM DONG',
   // Quang Nam (typo in GeoJSON: 'Quàng Nam')
   'QUANGNAM': 'QUANGNAM',
   // Bac Lieu
