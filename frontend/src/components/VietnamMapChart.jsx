@@ -225,6 +225,45 @@ const CARRIER_COLORS = [
   '#e11d48', '#0284c7', '#16a34a', '#ca8a04'
 ];
 
+// Colors for 34 merged provinces - based on merge groups
+const PROVINCE_GROUP_COLORS = {
+  'Hà Nội': '#3b82f6',
+  'Thành phố Hồ Chí Minh': '#10b981',
+  'Hải Phòng': '#f59e0b',
+  'Đà Nẵng': '#8b5cf6',
+  'Cần Thơ': '#ec4899',
+  'Huế': '#06b6d4',
+  'Tuyên Quang': '#f97316',
+  'Lào Cai': '#14b8a6',
+  'Thái Nguyên': '#a855f7',
+  'Phú Thọ': '#6366f1',
+  'Bắc Ninh': '#ef4444',
+  'Hưng Yên': '#84cc16',
+  'Ninh Bình': '#0284c7',
+  'Quảng Trị': '#d97706',
+  'Quảng Ngãi': '#c026d3',
+  'Gia Lai': '#059669',
+  'Khánh Hòa': '#dc2626',
+  'Đắk Lắk': '#7c3aed',
+  'Lâm Đồng': '#e11d48',
+  'Đồng Nai': '#0284c7',
+  'Tây Ninh': '#16a34a',
+  'Đồng Tháp': '#ca8a04',
+  'Vĩnh Long': '#f43f5e',
+  'An Giang': '#8b5cf6',
+  'Cà Mau': '#6366f1',
+  // Provinces not merged (keep unique colors)
+  'Cao Bằng': '#1e40af',
+  'Điện Biên': '#065f46',
+  'Hà Tĩnh': '#92400e',
+  'Lai Châu': '#7c2d12',
+  'Lạng Sơn': '#581c87',
+  'Nghệ An': '#be185d',
+  'Quảng Ninh': '#047857',
+  'Sơn La': '#b45309',
+  'Thanh Hóa': '#7e22ce',
+};
+
 const fmtNum = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v || 0));
 const fmtTons = (v) => fmtNum(v) + ' Tấn';
 const fmtCost = (v) => fmtNum(v) + ' ₫';
@@ -630,17 +669,10 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   const getGeoFillColor = (pInfo) => {
     // No data for this province
     if (!pInfo || pInfo.total_tons === 0) return isDark ? '#1e3a5f' : '#dde8f5';
-    const carrierEntries = Object.entries(pInfo.carriers || {});
-    if (carrierEntries.length === 0) return isDark ? '#1e3a5f' : '#dde8f5';
-
-    const dominantCarrier = carrierEntries.sort((a, b) => b[1] - a[1])[0][0];
-
-    if (selectedCarrier !== 'ALL') {
-      const hasCarrier = pInfo.carriers && pInfo.carriers[selectedCarrier];
-      if (hasCarrier) return carrierColorMap[selectedCarrier] || '#3b82f6';
-      return isDark ? '#1e3a5f' : '#dde8f5';
-    }
-    return carrierColorMap[dominantCarrier] || '#3b82f6';
+    
+    // Use province group color based on merged province name
+    const provinceName = pInfo.province;
+    return PROVINCE_GROUP_COLORS[provinceName] || (isDark ? '#1e3a5f' : '#dde8f5');
   };
 
   const getGeoOpacity = (pInfo) => {
