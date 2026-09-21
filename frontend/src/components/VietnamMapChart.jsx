@@ -225,43 +225,42 @@ const CARRIER_COLORS = [
   '#e11d48', '#0284c7', '#16a34a', '#ca8a04'
 ];
 
-// Colors for 34 merged provinces - based on merge groups
+// High-contrast color palette for 34 provinces (optimized for adjacent regions)
 const PROVINCE_GROUP_COLORS = {
-  'Hà Nội': '#3b82f6',
-  'Thành phố Hồ Chí Minh': '#10b981',
-  'Hải Phòng': '#f59e0b',
-  'Đà Nẵng': '#8b5cf6',
-  'Cần Thơ': '#ec4899',
-  'Huế': '#06b6d4',
-  'Tuyên Quang': '#f97316',
-  'Lào Cai': '#14b8a6',
-  'Thái Nguyên': '#a855f7',
-  'Phú Thọ': '#6366f1',
-  'Bắc Ninh': '#ef4444',
-  'Hưng Yên': '#84cc16',
-  'Ninh Bình': '#0284c7',
-  'Quảng Trị': '#d97706',
-  'Quảng Ngãi': '#c026d3',
-  'Gia Lai': '#059669',
-  'Khánh Hòa': '#dc2626',
-  'Đắk Lắk': '#7c3aed',
-  'Lâm Đồng': '#e11d48',
-  'Đồng Nai': '#0284c7',
-  'Tây Ninh': '#16a34a',
-  'Đồng Tháp': '#ca8a04',
-  'Vĩnh Long': '#f43f5e',
-  'An Giang': '#8b5cf6',
-  'Cà Mau': '#6366f1',
-  // Provinces not merged (keep unique colors)
-  'Cao Bằng': '#1e40af',
-  'Điện Biên': '#065f46',
-  'Hà Tĩnh': '#92400e',
-  'Lai Châu': '#7c2d12',
-  'Lạng Sơn': '#581c87',
-  'Nghệ An': '#be185d',
-  'Quảng Ninh': '#047857',
-  'Sơn La': '#b45309',
-  'Thanh Hóa': '#7e22ce',
+  'Hà Nội': '#ef4444',           // Red
+  'Thành phố Hồ Chí Minh': '#3b82f6', // Blue
+  'Hải Phòng': '#10b981',          // Emerald
+  'Đà Nẵng': '#f59e0b',            // Amber
+  'Cần Thơ': '#8b5cf6',            // Violet
+  'Huế': '#ec4899',                // Pink
+  'Tuyên Quang': '#06b6d4',        // Cyan
+  'Lào Cai': '#f97316',            // Orange
+  'Thái Nguyên': '#14b8a6',        // Teal
+  'Phú Thọ': '#a855f7',            // Purple
+  'Bắc Ninh': '#6366f1',            // Indigo
+  'Hưng Yên': '#84cc16',            // Lime
+  'Ninh Bình': '#e11d48',            // Rose
+  'Quảng Trị': '#0284c7',          // Sky blue
+  'Quảng Ngãi': '#d97706',         // Amber dark
+  'Gia Lai': '#059669',             // Emerald dark
+  'Khánh Hòa': '#dc2626',           // Red dark
+  'Đắk Lắk': '#7c3aed',            // Violet dark
+  'Lâm Đồng': '#be185d',           // Pink dark
+  'Đồng Nai': '#0891b2',           // Cyan dark
+  'Tây Ninh': '#c2410c',           // Orange dark
+  'Đồng Tháp': '#65a30d',          // Lime dark
+  'Vĩnh Long': '#9333ea',           // Purple dark
+  'An Giang': '#db2777',           // Pink dark
+  'Cà Mau': '#4d7c0f',             // Olive
+  'Cao Bằng': '#1d4ed8',           // Blue dark
+  'Điện Biên': '#059669',           // Emerald dark
+  'Hà Tĩnh': '#b91c1c',           // Red dark
+  'Lai Châu': '#c2410c',           // Orange dark
+  'Lạng Sơn': '#7c3aed',           // Violet dark
+  'Nghệ An': '#0891b2',            // Cyan dark
+  'Quảng Ninh': '#4d7c0f',         // Olive
+  'Sơn La': '#65a30d',             // Lime dark
+  'Thanh Hóa': '#9333ea',          // Purple dark
 };
 
 const fmtNum = (v) => new Intl.NumberFormat('vi-VN').format(Math.round(v || 0));
@@ -600,6 +599,11 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
       // Also store original name as fallback
       const origNorm = p.province?.toString().toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (origNorm && origNorm !== norm) map.set(origNorm, p);
+      
+      // Debug: log if province name contains Đắk Nông variants
+      if (p.province.toLowerCase().includes('đak') || p.province.toLowerCase().includes('dak')) {
+        console.log('🔍 Found Đắk Nông variant in data:', p.province, '→ normalized:', norm);
+      }
     });
     return map;
   }, [provincesData]);
@@ -836,13 +840,13 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
             </Geographies>
           </ComposableMap>
 
-          {/* Hover Tooltip - lower z-index to not cover map */}
+          {/* Hover Tooltip - very low z-index with offset to avoid covering map */}
           {tooltipContent && (
             <div
-              className="absolute z-30 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
+              className="absolute z-0 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
               style={{
-                left: `${tooltipPos.x}px`,
-                top: `${tooltipPos.y}px`,
+                left: `${tooltipPos.x + 20}px`,
+                top: `${tooltipPos.y + 20}px`,
                 backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.96)',
                 borderColor: '#475569',
                 color: '#f8fafc'
