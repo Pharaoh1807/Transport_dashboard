@@ -115,20 +115,20 @@ class TransportDataProcessor:
                 else:
                     ws = wb[sheet_name]
 
-                # Read header row
+                # Read header row (already detected)
                 header_row_idx = header_row + 1  # openpyxl is 1-indexed
                 headers = None
                 current_rows = []
 
+                # Read headers from the actual header row
+                header_row_data = list(ws[header_row_idx])
+                headers = [str(cell.value) if cell.value is not None else f"col_{j}" for j, cell in enumerate(header_row_data)]
+                print(f"📋 Headers detected from row {header_row_idx}: {headers[:5]}...")
+
                 print(f"📋 Reading data starting from row {header_row_idx + 1}...")
 
-                for i, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
-                    if i == 0:
-                        # First row after header is our data header
-                        headers = [str(cell) if cell is not None else f"col_{j}" for j, cell in enumerate(row)]
-                        print(f"📋 Headers detected: {headers[:5]}...")
-                        continue
-
+                # Read data rows (skip header row)
+                for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
                     current_rows.append(row)
 
                     # Memory cleanup periodically
