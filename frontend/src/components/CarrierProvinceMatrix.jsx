@@ -98,7 +98,7 @@ const CarrierProvinceMatrix = ({ data }) => {
       </div>
 
       {/* Heatmap Matrix Table */}
-      <div className="overflow-x-auto max-h-[420px]">
+      <div className="overflow-x-auto max-h-[840px]">
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr>
@@ -141,7 +141,7 @@ const CarrierProvinceMatrix = ({ data }) => {
           </thead>
           <tbody>
             {filteredMatrix.map((row) => (
-              <tr key={row.carrier_name}>
+              <tr key={row.carrier_name} className="h-12">
                 <td className={`sticky left-0 z-10 p-2.5 font-bold whitespace-nowrap border-r ${
                   isDark ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
                 }`}>

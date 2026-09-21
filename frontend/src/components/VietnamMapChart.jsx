@@ -801,10 +801,10 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
             </Geographies>
           </ComposableMap>
 
-          {/* Hover Tooltip z-50 */}
+          {/* Hover Tooltip - lower z-index to not cover map */}
           {tooltipContent && (
             <div
-              className="absolute z-50 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
+              className="absolute z-30 p-3.5 rounded-xl shadow-2xl border text-xs pointer-events-none min-w-[200px] max-w-[260px]"
               style={{
                 left: `${tooltipPos.x}px`,
                 top: `${tooltipPos.y}px`,
