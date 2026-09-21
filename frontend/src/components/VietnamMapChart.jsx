@@ -6,6 +6,218 @@ import api from '../api/client';
 
 const GEO_URL = '/Transport_dashboard/vietnam-provinces-wgs84.json';
 
+// Mapping 63 tỉnh cũ → 34 tỉnh mới (theo Nghị quyết 2025)
+// Format: old_province_name -> new_province_name
+const PROVINCE_MERGE_MAPPING = {
+  // ===== 6 Thành phố trực thuộc TW =====
+  // Hà Nội (giữ nguyên)
+  'Hà Nội': 'Hà Nội',
+  'Ha Noi': 'Hà Nội',
+  'Hanoi': 'Hà Nội',
+  
+  // Thành phố Hồ Chí Minh (TP.HCM + Bình Dương + Bà Rịa-Vũng Tàu)
+  'Thành phố Hồ Chí Minh': 'Thành phố Hồ Chí Minh',
+  'Hồ Chí Minh': 'Thành phố Hồ Chí Minh',
+  'Hồ Chí Minh city': 'Thành phố Hồ Chí Minh',
+  'TP.HCM': 'Thành phố Hồ Chí Minh',
+  'TPHCM': 'Thành phố Hồ Chí Minh',
+  'Ho Chi Minh': 'Thành phố Hồ Chí Minh',
+  'Ho Chi Minh City': 'Thành phố Hồ Chí Minh',
+  'Bình Dương': 'Thành phố Hồ Chí Minh',
+  'Binh Duong': 'Thành phố Hồ Chí Minh',
+  'Bà Rịa-Vũng Tàu': 'Thành phố Hồ Chí Minh',
+  'Ba Ria-Vung Tau': 'Thành phố Hồ Chí Minh',
+  
+  // Hải Phòng (Hải Phòng + Hải Dương)
+  'Hải Phòng': 'Hải Phòng',
+  'Hai Phong': 'Hải Phòng',
+  'Haiphong': 'Hải Phòng',
+  'Hải Dương': 'Hải Phòng',
+  'Hai Duong': 'Hải Phòng',
+  
+  // Đà Nẵng (Đà Nẵng + Quảng Nam)
+  'Đà Nẵng': 'Đà Nẵng',
+  'Da Nang': 'Đà Nẵng',
+  'Da Nẵng': 'Đà Nẵng',
+  'Quảng Nam': 'Đà Nẵng',
+  'Quàng Nam': 'Đà Nẵng', // typo có trong GeoJSON
+  'Quang Nam': 'Đà Nẵng',
+  
+  // Cần Thơ (Cần Thơ + Hậu Giang + Sóc Trăng)
+  'Cần Thơ': 'Cần Thơ',
+  'Can Tho': 'Cần Thơ',
+  'Can Thơ': 'Cần Thơ',
+  'Hậu Giang': 'Cần Thơ',
+  'Hau Giang': 'Cần Thơ',
+  'Sóc Trăng': 'Cần Thơ',
+  'Soc Trang': 'Cần Thơ',
+  
+  // Huế (nâng cấp từ Thừa Thiên Huế)
+  'Huế': 'Huế',
+  'Hue': 'Huế',
+  'Thừa Thiên Huế': 'Huế',
+  'Thua Thien Hue': 'Huế',
+  
+  // ===== 28 Tỉnh =====
+  // --- 9 tỉnh giữ nguyên ---
+  'Cao Bằng': 'Cao Bằng',
+  'Cao Bang': 'Cao Bằng',
+  'Điện Biên': 'Điện Biên',
+  'Dien Bien': 'Điện Biên',
+  'Hà Tĩnh': 'Hà Tĩnh',
+  'Ha Tinh': 'Hà Tĩnh',
+  'Lai Châu': 'Lai Châu',
+  'Lai Chau': 'Lai Châu',
+  'Lạng Sơn': 'Lạng Sơn',
+  'Lang Son': 'Lạng Sơn',
+  'Nghệ An': 'Nghệ An',
+  'Nghe An': 'Nghệ An',
+  'Quảng Ninh': 'Quảng Ninh',
+  'Quang Ninh': 'Quảng Ninh',
+  'Sơn La': 'Sơn La',
+  'Son La': 'Sơn La',
+  'Thanh Hóa': 'Thanh Hóa',
+  'Thanh Hoa': 'Thanh Hóa',
+  
+  // --- Trung du và miền núi phía Bắc ---
+  // Tuyên Quang (Hà Giang + Tuyên Quang)
+  'Tuyên Quang': 'Tuyên Quang',
+  'Tuyen Quang': 'Tuyên Quang',
+  'Hà Giang': 'Tuyên Quang',
+  'Ha Giang': 'Tuyên Quang',
+  
+  // Lào Cai (Yên Bái + Lào Cai)
+  'Lào Cai': 'Lào Cai',
+  'Lao Cai': 'Lào Cai',
+  'Yên Bái': 'Lào Cai',
+  'Yen Bai': 'Lào Cai',
+  
+  // Thái Nguyên (Bắc Kạn + Thái Nguyên)
+  'Thái Nguyên': 'Thái Nguyên',
+  'Thai Nguyen': 'Thái Nguyên',
+  'Bắc Kạn': 'Thái Nguyên',
+  'Bac Kan': 'Thái Nguyên',
+  
+  // Phú Thọ (Vĩnh Phúc + Hòa Bình + Phú Thọ)
+  'Phú Thọ': 'Phú Thọ',
+  'Phu Tho': 'Phú Thọ',
+  'Hòa Bình': 'Phú Thọ',
+  'Hoa Binh': 'Phú Thọ',
+  'Vĩnh Phúc': 'Phú Thọ',
+  'Vinh Phuc': 'Phú Thọ',
+  
+  // Bắc Ninh (Bắc Giang + Bắc Ninh)
+  'Bắc Ninh': 'Bắc Ninh',
+  'Bac Ninh': 'Bắc Ninh',
+  'Bắc Giang': 'Bắc Ninh',
+  'Bac Giang': 'Bắc Ninh',
+  
+  // --- Đồng bằng sông Hồng ---
+  // Hưng Yên (Thái Bình + Hưng Yên)
+  'Hưng Yên': 'Hưng Yên',
+  'Hưng Yen': 'Hưng Yên',
+  'Hung Yen': 'Hưng Yên',
+  'Thái Bình': 'Hưng Yên',
+  'Thai Binh': 'Hưng Yên',
+  
+  // Ninh Bình (Hà Nam + Nam Định + Ninh Bình)
+  'Ninh Bình': 'Ninh Bình',
+  'Ninh Binh': 'Ninh Bình',
+  'Hà Nam': 'Ninh Bình',
+  'Ha Nam': 'Ninh Bình',
+  'Nam Định': 'Ninh Bình',
+  'Nam Dinh': 'Ninh Bình',
+  
+  // --- Bắc Trung Bộ và Duyên hải miền Trung ---
+  // Quảng Trị (Quảng Bình + Quảng Trị)
+  'Quảng Trị': 'Quảng Trị',
+  'Quang Tri': 'Quảng Trị',
+  'Quảng Bình': 'Quảng Trị',
+  'Quang Binh': 'Quảng Trị',
+  
+  // Quảng Ngãi (Quảng Ngãi + Kon Tum)
+  'Quảng Ngãi': 'Quảng Ngãi',
+  'Quang Ngai': 'Quảng Ngãi',
+  'Kon Tum': 'Quảng Ngãi',
+  'Kontum': 'Quảng Ngãi',
+  
+  // Gia Lai (Gia Lai + Bình Định)
+  'Gia Lai': 'Gia Lai',
+  'Bình Định': 'Gia Lai',
+  'Binh Dinh': 'Gia Lai',
+  
+  // Khánh Hòa (Khánh Hòa + Ninh Thuận)
+  'Khánh Hòa': 'Khánh Hòa',
+  'Khanh Hoa': 'Khánh Hòa',
+  'Ninh Thuận': 'Khánh Hòa',
+  'Ninh Thuan': 'Khánh Hòa',
+  
+  // --- Tây Nguyên ---
+  // Đắk Lắk (Đắk Lắk + Phú Yên)
+  'Đắk Lắk': 'Đắk Lắk',
+  'Dak Lak': 'Đắk Lắk',
+  'DAKLAK': 'Đắk Lắk',
+  'Phú Yên': 'Đắk Lắk',
+  'Phu Yen': 'Đắk Lắk',
+  
+  // Lâm Đồng (Lâm Đồng + Đắk Nông + Bình Thuận)
+  'Lâm Đồng': 'Lâm Đồng',
+  'Lam Dong': 'Lâm Đồng',
+  'Đắk Nông': 'Lâm Đồng',
+  'Dak Nong': 'Lâm Đồng',
+  'DAKNONG': 'Lâm Đồng',
+  'Bình Thuận': 'Lâm Đồng',
+  'Binh Thuan': 'Lâm Đồng',
+  
+  // --- Đông Nam Bộ ---
+  // Đồng Nai (Đồng Nai + Bình Phước)
+  'Đồng Nai': 'Đồng Nai',
+  'Dong Nai': 'Đồng Nai',
+  'Bình Phước': 'Đồng Nai',
+  'Binh Phuoc': 'Đồng Nai',
+  'Southeast': 'Đồng Nai', // GeoJSON vn-331
+  
+  // Tây Ninh (Long An + Tây Ninh)
+  'Tây Ninh': 'Tây Ninh',
+  'Tay Ninh': 'Tây Ninh',
+  'Long An': 'Tây Ninh',
+  
+  // --- Đồng bằng sông Cửu Long ---
+  // Đồng Tháp (Đồng Tháp + Tiền Giang)
+  'Đồng Tháp': 'Đồng Tháp',
+  'Dong Thap': 'Đồng Tháp',
+  'Tiền Giang': 'Đồng Tháp',
+  'Tien Giang': 'Đồng Tháp',
+  
+  // Vĩnh Long (Bến Tre + Vĩnh Long + Trà Vinh)
+  'Vĩnh Long': 'Vĩnh Long',
+  'Vinh Long': 'Vĩnh Long',
+  'Bến Tre': 'Vĩnh Long',
+  'Ben Tre': 'Vĩnh Long',
+  'Trà Vinh': 'Vĩnh Long',
+  'Tra Vinh': 'Vĩnh Long',
+  
+  // An Giang (An Giang + Kiên Giang)
+  'An Giang': 'An Giang',
+  'Kiên Giang': 'An Giang',
+  'Kien Giang': 'An Giang',
+  
+  // Cà Mau (Cà Mau + Bạc Liêu)
+  'Cà Mau': 'Cà Mau',
+  'Ca Mau': 'Cà Mau',
+  'Bạc Liêu': 'Cà Mau',
+  'Bac Lieu': 'Cà Mau',
+};
+
+// Reverse mapping: new_province -> list of old provinces (for aggregation)
+const NEW_TO_OLD_MAPPING = {};
+Object.entries(PROVINCE_MERGE_MAPPING).forEach(([old, newP]) => {
+  if (!NEW_TO_OLD_MAPPING[newP]) {
+    NEW_TO_OLD_MAPPING[newP] = [];
+  }
+  NEW_TO_OLD_MAPPING[newP].push(old);
+});
+
 const CARRIER_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4',
   '#f97316', '#14b8a6', '#a855f7', '#6366f1', '#ef4444', '#84cc16',
@@ -31,7 +243,7 @@ const PROVINCE_ALIASES = {
   'THUA THIEN HUE': 'HUE',
   'THUATHIENHUECITY': 'HUE',
   // Southeast region in GeoJSON is vn-331, maps to Dong Nai area
-  'SOUTHEAST': 'SOUTHEAST',
+  'SOUTHEAST': 'DONGNAI',  // Map Southeast to Dong Nai
   // Hanoi
   'HANOI': 'HANOI',
   'HANOICITY': 'HANOI',
@@ -63,6 +275,12 @@ const PROVINCE_ALIASES = {
   'BINHDUONG': 'BINHDUONG',
   // Dong Nai
   'DONGNAI': 'DONGNAI',
+  // Phu Yen variants
+  'PHUYEN': 'PHUYEN',
+  'PHU YEN': 'PHUYEN',
+  // Tien Giang variants
+  'TIENGIANG': 'TIENGIANG',
+  'TIEN GIANG': 'TIENGIANG',
 };
 
 // Normalize province names for fuzzy matching between SAP data and GeoJSON
@@ -73,11 +291,19 @@ const normalizeName = (text) => {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd').replace(/Đ/g, 'D')
     .toUpperCase()
-    .replace(/^(TINH|TP\.?|THANH PHO|TT\.?|CITY)[\s\.]*/i, '')
+    .replace(/^(TINH|TP\.?|THANH PHO|TT\.?|CITY|THANHPHO)[\s\.]*/i, '')
     .replace(/[\s\.]*CITY$/i, '')
     .replace(/[^A-Z0-9]/g, '');
   return PROVINCE_ALIASES[str] || str;
 };
+
+// Add normalized versions to NEW_TO_OLD_MAPPING
+Object.keys(NEW_TO_OLD_MAPPING).forEach(newP => {
+  const norm = normalizeName(newP);
+  if (norm !== newP) {
+    NEW_TO_OLD_MAPPING[norm] = NEW_TO_OLD_MAPPING[newP];
+  }
+});
 
 // Route Table for selected carrier
 const CarrierRouteTable = ({ carrier, fileId, filters, isDark }) => {
@@ -260,7 +486,54 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [hoveredKey, setHoveredKey] = useState(null);
 
-  const provincesData = useMemo(() => data?.provinces || [], [data]);
+  const provincesData = useMemo(() => {
+    const rawProvinces = data?.provinces || [];
+    
+    // Aggregate data by new province names (34 provinces)
+    const aggregated = {};
+    
+    rawProvinces.forEach(p => {
+      const oldName = p.province;
+      // Normalize old name for matching
+      const oldNorm = normalizeName(oldName);
+      
+      // Try to find mapping by normalized name
+      let newName = oldName;
+      for (const [old, newP] of Object.entries(PROVINCE_MERGE_MAPPING)) {
+        if (normalizeName(old) === oldNorm) {
+          newName = newP;
+          break;
+        }
+      }
+      
+      if (!aggregated[newName]) {
+        aggregated[newName] = {
+          province: newName,
+          total_tons: 0,
+          total_cost: 0,
+          shipments: 0,
+          carriers: {}
+        };
+      }
+      
+      // Aggregate metrics
+      aggregated[newName].total_tons += (p.total_tons || 0);
+      aggregated[newName].total_cost += (p.total_cost || 0);
+      aggregated[newName].shipments += (p.shipments || 0);
+      
+      // Aggregate carriers
+      if (p.carriers) {
+        Object.entries(p.carriers).forEach(([carrier, tons]) => {
+          if (!aggregated[newName].carriers[carrier]) {
+            aggregated[newName].carriers[carrier] = 0;
+          }
+          aggregated[newName].carriers[carrier] += tons;
+        });
+      }
+    });
+    
+    return Object.values(aggregated);
+  }, [data]);
   const topCarriers = useMemo(() => data?.top_carriers || [], [data]);
 
   const carrierColorMap = useMemo(() => {
@@ -301,6 +574,13 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
     for (const candidate of candidates) {
       const norm = normalizeName(candidate);
       if (provinceLookupMap.has(norm)) return provinceLookupMap.get(norm);
+      
+      // Also try mapping old province name to new province name
+      const mappedName = PROVINCE_MERGE_MAPPING[candidate];
+      if (mappedName) {
+        const mappedNorm = normalizeName(mappedName);
+        if (provinceLookupMap.has(mappedNorm)) return provinceLookupMap.get(mappedNorm);
+      }
     }
     return null;
   }, [provinceLookupMap]);
@@ -308,22 +588,36 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
   // Audit province matching on data update
   useEffect(() => {
     if (provincesData.length > 0) {
-      console.log('🗺️ [VietnamMapChart] Auditing Province Name Matching...');
-      console.log('📌 Provinces in SAP Data:', provincesData.map(p => p.province));
+      console.log('🗺️ [VietnamMapChart] Auditing Province Name Matching (34 provinces 2025)...');
+      console.log('📌 Provinces in Aggregated Data:', provincesData.map(p => p.province));
+      console.log('📌 Normalized Provinces:', provincesData.map(p => normalizeName(p.province)));
 
       fetch(GEO_URL)
         .then(res => res.json())
         .then(geo => {
           const geoNames = geo.features.map(f => f.properties.name);
-          console.log('🗺️ Provinces in GeoJSON (63 features):', geoNames);
+          console.log('🗺️ Provinces in GeoJSON (63 old features):', geoNames);
 
           const geoNormSet = new Set(geoNames.map(g => normalizeName(g)));
-          const unmatched = provincesData.filter(p => !geoNormSet.has(normalizeName(p.province)));
+          
+          // Check if aggregated provinces can be matched via old province names
+          const unmatched = provincesData.filter(p => {
+            const norm = normalizeName(p.province);
+            // Direct match
+            if (geoNormSet.has(norm)) return false;
+            
+            // Check if any old province mapping to this new province exists in GeoJSON
+            const oldProvinces = NEW_TO_OLD_MAPPING[p.province] || [];
+            console.log(`🔍 Checking ${p.province}: old provinces = ${oldProvinces}`);
+            const hasOldMatch = oldProvinces.some(old => geoNormSet.has(normalizeName(old)));
+            console.log(`   Has old match: ${hasOldMatch}`);
+            return !hasOldMatch;
+          });
 
           if (unmatched.length > 0) {
             console.warn('⚠️ Unmatched Provinces between Data & GeoJSON:', unmatched.map(u => u.province));
           } else {
-            console.log('✅ 100% Data Provinces matched with GeoJSON Features!');
+            console.log('✅ 100% Data Provinces matched with GeoJSON Features (via old province mapping)!');
           }
         })
         .catch(err => console.error('Failed to audit GeoJSON:', err));
@@ -363,9 +657,26 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
           normalizeName(f.properties.name),
           normalizeName(f.properties['woe-name'] || '')
         ].filter(Boolean)));
-        const matched = provincesData.filter(p => geoNormSet.has(normalizeName(p.province))).length;
+        
+        const matched = provincesData.filter(p => {
+          const norm = normalizeName(p.province);
+          // Direct match
+          if (geoNormSet.has(norm)) return true;
+          
+          // Check via old province mapping
+          const oldProvinces = NEW_TO_OLD_MAPPING[p.province] || [];
+          return oldProvinces.some(old => geoNormSet.has(normalizeName(old)));
+        }).length;
+        
         setMatchedCount({ matched, total: provincesData.length });
-        const unmatched = provincesData.filter(p => !geoNormSet.has(normalizeName(p.province)));
+        
+        const unmatched = provincesData.filter(p => {
+          const norm = normalizeName(p.province);
+          if (geoNormSet.has(norm)) return false;
+          const oldProvinces = NEW_TO_OLD_MAPPING[p.province] || [];
+          return !oldProvinces.some(old => geoNormSet.has(normalizeName(old)));
+        });
+        
         if (unmatched.length > 0) {
           console.warn('⚠️ Unmatched provinces:', unmatched.map(u => `${u.province} -> ${normalizeName(u.province)}`));
         } else {
@@ -390,11 +701,11 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
               <Navigation className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
-              Bản Đồ Phủ Tuyến 63 Tỉnh Thành Việt Nam
+              Bản Đồ Phủ Tuyến 34 Tỉnh Thành Việt Nam (2025)
             </h3>
           </div>
           <p className={`text-xs mt-1 ${muted}`}>
-            Tô màu từng Tỉnh/Thành theo NVC chính — click NVC để lọc &amp; xem chi tiết tuyến
+            Dữ liệu đã gom theo 34 tỉnh/thành sau reform 2025 — Tô màu theo NVC chính
           </p>
         </div>
 
