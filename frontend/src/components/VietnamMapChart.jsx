@@ -627,6 +627,13 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
         const mappedNorm = normalizeName(mappedName);
         if (provinceLookupMap.has(mappedNorm)) return provinceLookupMap.get(mappedNorm);
       }
+      
+      // Also try normalized candidate in PROVINCE_MERGE_MAPPING
+      const mappedNameFromNorm = PROVINCE_MERGE_MAPPING[norm];
+      if (mappedNameFromNorm) {
+        const mappedNorm2 = normalizeName(mappedNameFromNorm);
+        if (provinceLookupMap.has(mappedNorm2)) return provinceLookupMap.get(mappedNorm2);
+      }
     }
     return null;
   }, [provinceLookupMap]);
@@ -674,6 +681,13 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
     // No data for this province
     if (!pInfo || pInfo.total_tons === 0) return isDark ? '#1e3a5f' : '#dde8f5';
     
+    // When a specific carrier is selected, only color provinces that have that carrier
+    if (selectedCarrier !== 'ALL') {
+      if (!pInfo.carriers || !pInfo.carriers[selectedCarrier]) {
+        return isDark ? '#0f172a' : '#1e293b'; // Black/dark gray for provinces without selected carrier
+      }
+    }
+    
     // Use province group color based on merged province name
     const provinceName = pInfo.province;
     return PROVINCE_GROUP_COLORS[provinceName] || (isDark ? '#1e3a5f' : '#dde8f5');
@@ -681,7 +695,7 @@ const VietnamMapChart = ({ data, activeFileId, filters }) => {
 
   const getGeoOpacity = (pInfo) => {
     if (selectedCarrier === 'ALL') return 1.0;
-    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.35;
+    if (!pInfo || !pInfo.carriers?.[selectedCarrier]) return 0.2; // Very dim for provinces without selected carrier
     return 1.0;
   };
 
